@@ -4,6 +4,7 @@ const cors = require("cors");
 // routes
 const loginRouter = require("./Router/login");
 const signupRouter = require("./Router/signup");
+const userRouter = require("./Router/userRoutes")
 
 const cookieParser = require("cookie-parser");
 
@@ -26,6 +27,7 @@ app.get("", (req, response) => {
 
 app.use("/login", loginRouter);
 app.use("/signup", signupRouter);
+app.use("/user", userRouter);
 
 app.listen(3000, () => {
     console.log("listening to port 3000");
