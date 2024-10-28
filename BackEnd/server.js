@@ -45,7 +45,7 @@ app.listen(3000, () => {
 io.on("connection", (socket) => {
   console.log("new user is here :: ", socket.id);
 
-  socket.on("room:join", ({ email, room }) => {
+  socket.on("room:join", ({ email, room })  => {
     console.log("email room and socketID is :: ", email, room, socket.id);
     const data = { email, room, socketID: socket.id };
  
