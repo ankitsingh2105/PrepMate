@@ -5,6 +5,7 @@ import links from "../../connect";
 const Signup = () => {
     const { backEndLink } = links;
     const [email, setEmail] = useState('');
+    const [name, setName] = useState("");
     const [userName, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
@@ -13,7 +14,7 @@ const Signup = () => {
         e.preventDefault();
         try {
             let response = await axios.post(`${backEndLink}/signup`, {
-                email, userName, password
+                email, userName, password, name
             }, { withCredentials: true });
 
             console.log("resposne is :: ", response);
@@ -22,8 +23,7 @@ const Signup = () => {
         catch (error) {
             console.log("error", error);
         }
-        console.log({ email, userName, password });
-        console.log({ email, userName, password });
+        console.log({ name, email, userName, password });
     };
 
 
@@ -31,6 +31,16 @@ const Signup = () => {
         <div className="flex items-center p-8 justify-center bg-gray-100">
             <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md w-96">
                 <h2 className="text-2xl font-bold mb-6 text-center text-purple-600">Sign Up</h2>
+                <div className="mb-4">
+                    <label className="block text-gray-700">Name</label>
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                        className="mt-1 block w-full p-2 border border-gray-300 rounded"
+                    />
+                </div>
                 <div className="mb-4">
                     <label className="block text-gray-700">Email</label>
                     <input

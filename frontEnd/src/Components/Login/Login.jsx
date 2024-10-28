@@ -10,16 +10,19 @@ const Login = () => {
     const [password, setPassword] = useState('');
 
     const navigate = useNavigate();
-    const handleSubmit = async(e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        try{
-            let response = await axios.post(`${backEndLink}/login` , {
-                userName , password
+        try {
+            let response = await axios.post(`${backEndLink}/login`, {
+                userName, password
+            }, {
+                withCredentials: true,
             })
             console.log(response);
+            navigate("/");
         }
-        catch(error){
-            console.log("error" , error);
+        catch (error) {
+            console.log("error", error);
         }
         console.log({ userName, password });
     };

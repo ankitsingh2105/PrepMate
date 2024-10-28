@@ -7,7 +7,7 @@ const User = require("../Model/userModel");
 const router = express.Router();
 
 router.post("/", async (req, res) => {
-    const { userName, email, password } = req.body;
+    const { userName, email, password, name } = req.body;
     console.log("Registering User:", userName, email);
 
     try {
@@ -22,6 +22,7 @@ router.post("/", async (req, res) => {
             userName,
             email,
             password, 
+            name
         });
 
         // todo :: Hashing the password before saving the user
@@ -30,10 +31,9 @@ router.post("/", async (req, res) => {
 
         await user.save();
 
-        const token = jwt.sign({ userId: user._id }, 'ankit', { expiresIn: '1h' });
+        const token = jwt.sign({ userName: userName }, 'ankit', { expiresIn: '1h' });
 
         res.cookie('token', token, {
-            maxAge: 3600000, 
             httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
             secure: false,  // Set to true if you're using HTTPS
         });

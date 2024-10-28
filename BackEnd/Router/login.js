@@ -8,10 +8,10 @@ const router = express.Router();
 
 router.post("/", async (req, response) => {
     console.log("logging in");
-    const { userName, password, email } = req.body;
-    console.log(userName, password, email);
+    const { userName, password } = req.body;
+    console.log(userName, password);
     try {
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ userName });
         if (!user) {
             return response.status(400).json({
                 message: "User does not exist"
@@ -25,11 +25,12 @@ router.post("/", async (req, response) => {
             })
         }
 
-        const token = jwt.sign({ userId: user._id }, 'ankit', { expiresIn: '1h' });
+        const token = jwt.sign({ userName: userName }, 'ankit', { expiresIn: '1h' });
 
         // httpOnly: true, // * :: Prevents client-side JavaScript from accessing the cookie
         response.cookie('token', token, {
-            maxAge: 3600000,
+            httpOnly: true,
+            secure: false,  
         });
 
         response.json({

@@ -1,11 +1,9 @@
 const express = require("express");
-const bycrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const {handleUserInfo} = require("../Controller/userController/userController");
-const User = require("../Model/userModel");
-const verifyUserMiddleware = require("../middleWare/verifyUser")
 const router = express.Router();
+const verifyUserMiddleware = require("../middleWare/verifyUser")
+const {handleUserInfo, handleUserLogout} = require("../Controller/userController/userController");
 
 router.get("/getInfo", verifyUserMiddleware, handleUserInfo);
+router.get("/logout" , verifyUserMiddleware, handleUserLogout);
 
 module.exports = router;
