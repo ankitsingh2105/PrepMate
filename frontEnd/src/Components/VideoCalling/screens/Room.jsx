@@ -251,7 +251,7 @@ export default function Room({ roomWidth, roomHeight }) {
                   <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={remoteStream} />
                   <h1 style={{ marginTop: "-27px", fontWeight: "bolder" }}>{otherUsername}</h1>
                 </>
-                :
+                 :
                 <>
                   <div className='remoteUser' style={{ width: roomWidth, height: roomWidth, marginTop : "30px" }} >
                     Please wait for someone to enter the room
