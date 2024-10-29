@@ -8,6 +8,7 @@ import { Provider } from "react-redux"
 import SocketProvider from "./Components/VideoCalling/context/SocketProvider";
 import store from "./Components/Redux/Store/store"
 import Room from "./Components/VideoCalling/screens/Room"
+import DSAScreen from "./Components/DSAScreen/DSAScreen"
 function App() {
 
   return (
@@ -20,7 +21,8 @@ function App() {
               <Route path="/" element={<><Home /></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
-              <Route path='/room/:id' element={<Room roomHeight={200} roomWidth={200} />} />
+              <Route path="/dsaMock/room/:id" element={<DSAScreen />} />
+              <Route path='/behMock/room/:id' element={<Room roomHeight={500} roomWidth={500} />} />
             </Routes>
           </BrowserRouter>
         </Provider>

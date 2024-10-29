@@ -1,0 +1,37 @@
+.editor{
+    box-shadow: 0px 0px 5px rgb(140, 139, 139);
+    padding: 5px;
+    margin-top: 10px;
+}
+
+.mainDiv option, .mainDiv select{
+    background-color: #6b46c1;
+    color: white;
+    font-size: 15px;
+}
+
+.mainDiv select{
+    padding: 5px 0px;
+    border: 1px solid rgb(84, 84, 84);
+    border-radius: 3px;
+}
+
+.mainDiv textarea{
+    box-shadow: 0px 0px 2px #6b46c1;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+.mainDiv button{
+    background-color: #6b46c1;
+    color: white;
+    border-radius: 3px;
+    padding: 3px 4px;
+}
+
+.finalResult{
+    background-color: aliceblue;
+    padding: 10px;
+    margin: 10px 0px;
+    box-shadow: 0px 0px 1px rgb(121, 121, 121);
+}

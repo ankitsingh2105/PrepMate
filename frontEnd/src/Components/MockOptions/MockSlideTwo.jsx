@@ -1,7 +1,34 @@
 import React from 'react'
 import "./mock.css"
+import { useNavigate } from "react-router-dom";
+import {ToastContainer} from "react-toastify"
 export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
     console.log(mock);
+    const navigate = useNavigate();
+
+    const handleRoundWithFriends = () => {
+        console.log("beh round", mock.m1);
+        const roundType = mock.m1;
+        const roomID = generateRandomString();
+        if (roundType == "BEH") {
+            navigate(`/behMock/room/${roomID}`)
+            return;
+        }
+        navigate(`/dsaMock/room/${roomID}`)
+
+    }
+
+    function generateRandomString() {
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let result = '';
+        for (let i = 0; i < 10; i++) {
+            const randomIndex = Math.floor(Math.random() * characters.length);
+            result += characters[randomIndex];
+        }
+        return result;
+    }
+
+    // http://localhost:5173/behMock/room/aq2k8Sg
     return (
         <div className="mockSlides2 flex items-center justify-center">
 
@@ -22,7 +49,7 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
                         </div>
                     </div>
 
-                    <div className="border-2 border-gray-200 rounded-lg p-4 cursor-pointer">
+                    <div onClick={handleRoundWithFriends} className="border-2 border-gray-200 rounded-lg p-4 cursor-pointer">
                         <div className="flex items-center space-x-3">
                             <i className="text-purple-600 fas fa-user-friends text-xl"></i>
                             <div>

@@ -5,8 +5,10 @@ import peer from '../service/peer';
 import { useLocation } from 'react-router-dom';
 import { useSelector } from "react-redux";
 import "./Room.css"
+import { ToastContainer, toast } from "react-toastify"
+import 'react-toastify/dist/ReactToastify.css';
 
-export default function Room({ roomWidth, roomHeight }) {
+export default function Room({ windowWidth, roomWidth, roomHeight, direction }) {
   const socket = useSocket();
   const [remoteSocketId, setremoteSocketId] = useState("")
   const [myStream, setmyStream] = useState(null);
@@ -14,6 +16,15 @@ export default function Room({ roomWidth, roomHeight }) {
   const [remoteStream, setremoteStream] = useState(null);
   const [inComingCall, setInComingCall] = useState(false);
   const [otherUsername, setOtherUserName] = useState("");
+
+
+  // display invitation link
+  const location = useLocation();
+  console.log("path is :: ", location);
+  const currentPageUrl = `http://localhost:5173${location.pathname}`;
+  useEffect(() => {
+    toast("Copy the url and send to a friend", { autoClose: 1500 })
+  }, [])
 
   const userInfo = useSelector((state) => state.userInfo);
   const { userDetails } = userInfo;
@@ -203,20 +214,38 @@ export default function Room({ roomWidth, roomHeight }) {
     };
   }, [socket, handleUserJoined, handleIncomingCall]);
 
+  const handleCopy = (textToCopy) => {
+    navigator.clipboard.writeText(textToCopy)
+      .then(() => {
+        toast.success('Invite link copied to clipboard!', { autoClose: 1500 });
+      })
+      .catch((error) => {
+        console.error('Failed to copy text: ', error);
+        setCopySuccess('Failed to copy text.');
+      });
+  };
+
+
+  const placeCall = () =>{
+    toast.success("Calling the other user" , {autoClose : 5000});
+  }
+
   return (
-    <center>
+    <center style={{ width: windowWidth }} >
+      <ToastContainer />
       {
         loading ?
           <>
+            <small>Send this to a friend <div> http://localhost:5173{location.pathname} &nbsp; <i onClick={() => { handleCopy(currentPageUrl) }} class="fa-regular fa-copy"></i> </div></small>
             <h3 className='isConnected' >{otherUsername && remoteSocketId.length != 0 ?
-            <>
-              <h1 style={{backgroundColor : "rgb(76, 255, 76"}}>Connected</h1>
-            </>  
-            :
-            <>
-              <h1 style={{backgroundColor : "red", color:"white"}}>Disconnected</h1>
-            </>
-          }</h3>
+              <>
+                <h1 style={{ backgroundColor: "rgb(76, 255, 76" }}>Connected</h1>
+              </>
+              :
+              <>
+                <h1 style={{ backgroundColor: "red", color: "white" }}>Disconnected</h1>
+              </>
+            }</h3>
             {
               otherUsername && remoteSocketId.length === 0 ? (
                 <></>
@@ -226,38 +255,44 @@ export default function Room({ roomWidth, roomHeight }) {
                     handleCall();
                     sendStreams();
                   }}>
-                    <i style={{color : "#6b46c1"}} class="fa-solid fa-phone"></i>
+                    <i style={{ color: "#6b46c1" }} class="fa-solid fa-phone"></i>
                     <br />
-                    <b style={{color : "#6b46c1"}} >Call</b>
+                    <b onClick={placeCall} style={{ color: "#6b46c1" }} >Call</b>
                   </button>
                 </center>
               )
             }
+            <main style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: direction }} >
+              <div>
+                {
+                  myStream ?
+                    <>
+                      <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={myStream} />
 
-            {
-              myStream ?
-                <>
-                  <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={myStream} />
+                      <div style={{ marginTop: "-27px", fontWeight: "bolder" }} >You</div>
+                    </>
+                    :
+                    <>
+                    </>
+                }
+              </div>
+              <div>
 
-                  <div style={{ marginTop: "-27px", fontWeight: "bolder" }} >You</div>
-                </>
-                :
-                <>
-                </>
-            }
-            {
-              inComingCall && remoteStream ?
-                <>
-                  <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={remoteStream} />
-                  <h1 style={{ marginTop: "-27px", fontWeight: "bolder" }}>{otherUsername}</h1>
-                </>
-                 :
-                <>
-                  <div className='remoteUser' style={{ width: roomWidth, height: roomWidth, marginTop : "30px" }} >
-                    Please wait for someone to enter the room
-                  </div>
-                </>
-            }
+                {
+                  inComingCall && remoteStream ?
+                    <main style={{ margin: "10px" }} >
+                      <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={remoteStream} />
+                      <h1 style={{ marginTop: "-27px", fontWeight: "bolder" }}>{otherUsername}</h1>
+                    </main>
+                    :
+                    <>
+                      <div className='remoteUser' style={{ margin: "10px", width: roomWidth - 50, height: roomHeight - 110, marginTop: "30px" }} >
+                        Please wait for someone to enter the room
+                      </div>
+                    </>
+                }
+              </div>
+            </main>
           </>
           :
           <>
