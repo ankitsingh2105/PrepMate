@@ -8,7 +8,6 @@ const router = express.Router();
 
 router.post("/", async (req, res) => {
     const { userName, email, password, name } = req.body;
-    console.log("Registering User:", userName, email);
 
     try {
         let user = await User.findOne({ email });
@@ -37,7 +36,6 @@ router.post("/", async (req, res) => {
             httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
             secure: false,  // Set to true if you're using HTTPS
         });
-        console.log("user added cookie send");
         res.status(201).json({
             message: "SignUp successfull",
         });

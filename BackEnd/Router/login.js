@@ -7,7 +7,6 @@ const User = require("../Model/userModel");
 const router = express.Router();
 
 router.post("/", async (req, response) => {
-    console.log("logging in");
     const { userName, password } = req.body;
     console.log(userName, password);
     try {

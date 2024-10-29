@@ -13,7 +13,6 @@ const verifyUserMiddleware = async (req, res, next) => {
         if (err) {
             return res.status(403).json({ message: 'Forbidden: Invalid token' });
         }
-        console.log("decoding here :: ", decoded);
         req.user = decoded; 
         next();
     });
