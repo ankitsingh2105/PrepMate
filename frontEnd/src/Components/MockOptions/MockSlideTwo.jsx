@@ -28,6 +28,17 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
         return result;
     }
 
+    function handleRoundWithPeers(){
+        console.log(mock.m1);
+        // if()
+        if(mock.m1 == "DSA"){
+            
+            return;
+        }
+
+
+    }
+
     // http://localhost:5173/behMock/room/aq2k8Sg
     return (
         <div className="mockSlides2 flex items-center justify-center">
@@ -38,7 +49,7 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
                     <i onClick={() => setShowMocks(false)} className="text-purple-600 fas fa-times cursor-pointer"></i>
                 </div>
 
-                <div className="space-y-4">
+                <div onClick={handleRoundWithPeers} className="space-y-4">
                     <div className="border-2 rounded-lg p-4 cursor-pointer">
                         <div className="flex items-center space-x-3">
                             <i className="text-purple-600 fas fa-users text-xl"></i>

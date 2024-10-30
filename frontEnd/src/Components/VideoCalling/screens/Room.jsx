@@ -226,8 +226,8 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
   };
 
 
-  const placeCall = () =>{
-    toast.success("Calling the other user" , {autoClose : 5000});
+  const placeCall = () => {
+    toast.success("Calling the other user", { autoClose: 5000 });
   }
 
   return (
