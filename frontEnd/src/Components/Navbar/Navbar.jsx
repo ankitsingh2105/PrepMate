@@ -15,7 +15,7 @@ export default function Navbar() {
     const dispatch = useDispatch();
     const userInfo = useSelector((state) => state.userInfo);
     const { userDetails, loading } = userInfo;
-    console.log(userDetails);
+    // console.log(userDetails);
 
     useEffect(() => {
         dispatch(handleUserInfo());
