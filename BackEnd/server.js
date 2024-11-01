@@ -38,7 +38,7 @@ app.use("/user", userRouter);
 app.listen(3000, () => {
   console.log("listening to port 3000");
 })
-
+ 
 
 
 
@@ -92,13 +92,10 @@ ioForChat.on("connection", (socket) => {
 
   socket.on("joinRoom", (room) => {
     socket.join(room);
-    console.log(`User joined room: ${room}`);
   });
 
 
   socket.on("user:codeChange", ({ room, sourceCode }) => {
-    console.log("room is :: , ", room, typeof (room));
-    console.log("the name is the user is ", room, sourceCode);
     ioForChat.to(room).emit("user:codeChangeAccepted", { sourceCode });
   })
 

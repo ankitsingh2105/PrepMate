@@ -5,14 +5,20 @@ const mockSchema = new mongoose.Schema({
         type : String,
     },
     schedule : {
-        type : Date
+        type : String
     },
     tempLock : {
         type : Boolean,
+        default : false,
     },
     isAvailable : {
-        type : Boolean
+        type : Boolean,
+        default : true,
+    },
+    user : {
+        type : mongoose.Schema.Types.ObjectId,
+        ref : "User", 
     }
 })
-
-modules.exports =  mongoose.model("Mock" , mockSchema);
+ 
+module.exports =  mongoose.model("Mock" , mockSchema);
