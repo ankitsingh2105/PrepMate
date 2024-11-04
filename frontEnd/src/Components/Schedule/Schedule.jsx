@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import "./Schedule.css";
+import { ToastContainer, toast } from "react-toastify"
+import link from "../../connect"
+import axios from "axios";
+import { useSelector } from "react-redux"
 
 export default function Schedule() {
 
     const [timeArray, setTimeArray] = useState([]);
-    const [timeSlot , setTimeSlot] = useState({});
+    const [timeSlot, setTimeSlot] = useState({});
     const timeSlots = [
         "9:30 AM",
         "11:30 AM",
@@ -14,6 +18,9 @@ export default function Schedule() {
         "7:30 PM",
         "9:30 PM"
     ];
+
+    const userInfo = useSelector((state) => state.userInfo);
+    const { userDetails, loading } = userInfo;
 
     function getNextFourDays() {
         const dates = [];
@@ -31,17 +38,32 @@ export default function Schedule() {
     }, []);
 
     const timeAndDateSchedule = ({ e, time }) => {
-        console.log("time is :: ", e, time);
-        setTimeSlot({date:e , time});
+        setTimeSlot({ date: e, time });
+        toast(`Please check availability for \n ${e} ${time}`, { autoClose: 2000 });
     };
 
-    const checkAvailiability = () =>{
-        console.log(timeSlot);
+    const checkAvailiability = async () => {
+        if (!timeSlot.time) {
+            toast.error("Please select a time slot", { autoClose: 1000 })
+            return;
+        }
+        const { backEndLink } = link;
+        try {
+            let response = await axios.post(`${backEndLink}/user/checkAvailability`, {mockType : "dsa", timeSlot, userId : userDetails._id}, {
+                withCredentials: true
+            })
+            console.log("Message :: ", response.data);
+            toast(response.data, {autoClose :  1500});
+        }
+        catch (error) {
+            console.log("messages :: ", error);
+        }
     }
 
     return (
         <>
             <div className="scheduleMain">
+                <ToastContainer />
                 <br />
                 <h2 className="text-xl font-semibold">Select a time to practice</h2>
                 <br />

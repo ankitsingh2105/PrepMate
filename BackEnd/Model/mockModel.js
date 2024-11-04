@@ -11,9 +11,8 @@ const mockSchema = new mongoose.Schema({
         type : Boolean,
         default : false,
     },
-    isAvailable : {
+    ifAddedToList : {
         type : Boolean,
-        default : true,
     },
     user : {
         type : mongoose.Schema.Types.ObjectId,
