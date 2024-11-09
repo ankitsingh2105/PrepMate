@@ -66,7 +66,7 @@ export default function UserProfile() {
     const socket = io('http://localhost:9001');
 
     const handleBookingCancel = async (myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime) => {
-        console.log("op :: ", myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime);
+        console.log("op :: ", myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime) ;
         try {
             await axios.post(`${backEndLink}/user/cancelBooking`,
                 { myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime },
