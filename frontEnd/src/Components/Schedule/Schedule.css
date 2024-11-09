@@ -32,3 +32,17 @@
     padding: 6px 7px;
     border-radius: 10px ;
 }
+.userProfileMain button{
+    background-color: rgb(147 51 234) ;
+    margin-top: 10px;
+    color: white;
+    padding: 6px 7px;
+    border-radius: 10px ;
+}
+
+.scheduleSuccess{
+    position: fixed;
+    top:15%;
+    z-index: 1000;
+    box-shadow: 1px 1px 30px rgb(104, 103, 103);
+}

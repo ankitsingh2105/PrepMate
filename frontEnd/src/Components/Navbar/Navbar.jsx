@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import links from "../../connect";
 import { useDispatch, useSelector } from "react-redux"
 import axios from "axios";
+import io from "socket.io-client"
 
 import { handleUserInfo } from "../Redux/Slices/userInfoSlice";
 
@@ -36,6 +37,8 @@ export default function Navbar() {
         }
     }
 
+     
+
     return (
         <>
             <nav class="flex items-center justify-between p-4 border-b">
@@ -52,7 +55,7 @@ export default function Navbar() {
                         <button className=''>
                             Welcome <b>{userDetails.name.split(" ")[0]}</b>
                         </button>
-                        <button className='bg-purple-600 text-white px-3 py-1 rounded-full '>
+                        <button onClick={()=>{navigate(`/user/profile/${userDetails.userName}`)}} className='bg-purple-600 text-white px-3 py-1 rounded-full '>
                             {userDetails.name[0]}
                         </button>
                         <button onClick={handleLogout} className='bg-purple-600 text-white px-3 py-1 rounded '>

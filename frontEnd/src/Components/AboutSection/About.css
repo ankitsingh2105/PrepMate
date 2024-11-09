@@ -1,0 +1,41 @@
+.highlight {
+    color: #ffffff; /* Tailwind's purple-600 */
+}
+.card {
+    background-color: #f7fafc; /* Tailwind's gray-100 */
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    margin: 30px 10px;
+    width: 50%;
+}
+.card-icon {
+    font-size: 48px;
+    margin: 30px;
+    color: rgb(30, 30, 30);
+}
+.card-title {
+    color: #6b46c1; /* Tailwind's purple-600 */
+    font-size: 30px;
+    font-weight: bolder;
+    margin-bottom: 10px;
+
+}
+.card-text {
+    font-size: 16px;
+    font-weight: 500;
+}
+.mainAbout {
+    background-color: #a378ff;
+    padding: 30px;
+}
+
+.aboutMainHeading h1{
+    font-size: 50px;
+    margin: 30px;
+}
+
+.aboutMainHeading h1, .aboutMainHeading h2{
+    color: rgb(30, 30, 30);
+}

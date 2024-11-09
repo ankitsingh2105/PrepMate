@@ -8,8 +8,8 @@ async function handleUserInfo(req, response) {
     const { userName } = req.user;
     try {
         const userData = await userModel.findOne({ userName });
-        const { email, name, _id } = userData;
-        response.status(200).send({ _id, userName, email, name });
+        const { email, name, _id, bookings, bio } = userData;
+        response.status(200).send({ _id, userName, email, name, bookings, bio });
     }
     catch (error) {
         console.log("error :: ", error);
@@ -21,6 +21,7 @@ async function handleUserInfo(req, response) {
 async function handleAvailability(req, response) {
     const { timeSlot, mockType, userId } = req.body;
     const { date, time } = timeSlot;
+    console.log("masaala is  :: ", timeSlot, mockType, userId)
     const checkSchedule = date + " " + time;
 
     try {
@@ -42,7 +43,7 @@ async function handleAvailability(req, response) {
                 mockType: mockType,
                 schedule: checkSchedule,
                 user: { $ne: userId },
-                tempLock: false 
+                tempLock: false
             },
             { $set: { tempLock: true } },  // * Atomically lock this booking (in instance)
             { new: true }  // * Return the updated document
@@ -51,36 +52,40 @@ async function handleAvailability(req, response) {
         if (conflictingBooking) {
             console.log("currentUser :: ", userId);
             console.log(conflictingBooking.user);
-            let idd = conflictingBooking.user
+            let idd = (conflictingBooking.user).valueOf();
+            let otherUserTicketID = (conflictingBooking._id).valueOf()
             try {
-                let otherUser = await userModel.findOneAndUpdate(
-                    { _id: idd }, 
-                    {
-                        $push: { bookings: { userId, checkSchedule } }
-                    }
-                );
+                const newMockModel = new mockModel({
+                    mockType,
+                    schedule: checkSchedule,
+                    tempLock: true,
+                    user: userId
+                });
+
+                let bookingId = (newMockModel._id).valueOf();
                 let sameUser = await userModel.findOneAndUpdate(
-                    { _id: userId }, 
+                    { _id: userId },
                     {
-                        $push: { bookings: { idd, checkSchedule } }
+                        $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId : bookingId , otherUserTicketID } }
                     }
                 );
-                
+                let otherUser = await userModel.findOneAndUpdate(
+                    { _id: idd },
+                    {
+                        $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId : otherUserTicketID, otherUserTicketID : bookingId } }
+                    }
+                );
+
+                await newMockModel.save();
                 console.log("found the other user :: ", otherUser);
                 console.log("found the other user :: ", sameUser);
+                console.log("Matching booking found for another user, locking it temporarily.");
+                response.send("Your booking is confirmed, please check your profile");
             }
             catch (error) {
                 console.log("found the other user error :: ", error);
+                response.send(error)
             }
-            console.log("Matching booking found for another user, locking it temporarily.");
-            response.send("Your booking is confirmed, please check your profile");
-            const newMockModel = new mockModel({
-                mockType,
-                schedule: checkSchedule,
-                tempLock: true,
-                user: userId
-            });
-            await newMockModel.save();
         }
 
         else {
@@ -96,8 +101,8 @@ async function handleAvailability(req, response) {
             response.send("No one to schedule we are adding you for booking");
         }
 
-    } 
-    
+    }
+
     catch (error) {
         console.log("Error in handling availability:", error);
         response.status(500).send("Server error");
@@ -115,8 +120,80 @@ function handleUserLogout(req, response) {
 }
 
 
+async function handleUpdateUserInfo(req, response) {
+    console.log("updating info");
+    console.log(req.body);
+    const { email, name, bio } = req.body;
+    try {
+        let newUser = await userModel.findOneAndUpdate({ userName }, {
+            email,
+            name,
+            bio
+        })
+        console.log("new user :: ", newUser);
+        response.send("User info updated");
+    }
+    catch (error) {
+
+    }
+}
+
+async function handleCancelBooking(req, res) {
+    const { myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime } = req.body;
+    // todo :: go to both users and using ticket if remove the elemt of the booking array
+    // * removing ticket entry from my side
+    try{
+        let response = await userModel.findOneAndUpdate({_id : myUserId},
+            {
+                $pull : {
+                    bookings : {
+                        otherUserTicketID
+                    }
+                }
+            },
+            { new: true }
+        )
+    }
+    catch(error){
+        console.log("first error ::  ", error);
+    }
+    // * removing ticket entry other my side
+    try{
+        let response = await userModel.findOneAndUpdate({_id : otherUserId},
+            {
+                $pull : {
+                    bookings : {
+                        myTicketId : otherUserTicketID
+                    }
+                }
+            },
+            { new: true } 
+        )
+    } 
+    catch(error){
+        console.log("second error ::  ", error);
+    }
+    // *remove the mock model from my side
+    try{
+        await mockModel.findOneAndDelete({_id : myTicketId})
+    }
+    catch(error){
+        console.log("third :: " , error);
+    }
+    // *remove the mock model from the other side
+    try{
+        await mockModel.findOneAndDelete({_id : otherUserTicketID})
+    }
+    catch(error){
+        console.log("fourth :: " , error);
+    }
+    res.send("Booking cancelled");
+}
+
 module.exports = {
     handleUserInfo,
     handleUserLogout,
-    handleAvailability
+    handleAvailability,
+    handleUpdateUserInfo,
+    handleCancelBooking
 };

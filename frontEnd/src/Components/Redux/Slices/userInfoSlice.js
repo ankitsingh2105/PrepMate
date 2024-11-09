@@ -8,7 +8,6 @@ export const handleUserInfo = createAsyncThunk("/getUserInfo", async () => {
     const response = await axios.get(`${backEndLink}/user/getInfo`, {
         withCredentials: true,
     });
-    // console.log("response in store :: ", response);
     return response.data;
 })
 

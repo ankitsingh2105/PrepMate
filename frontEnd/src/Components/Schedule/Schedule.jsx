@@ -1,11 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import "./Schedule.css";
 import { ToastContainer, toast } from "react-toastify"
 import link from "../../connect"
 import axios from "axios";
 import { useSelector } from "react-redux"
+import { useLocation } from 'react-router-dom';
+import ScheduleSuccess from './ScheduleSuccess';
 
 export default function Schedule() {
+
+
+    const location = useLocation();
+    const mockType = location.state?.mockType;
+    const infoDisplay = useRef(null);
+
+    console.log("Mock Type:", mockType);
 
     const [timeArray, setTimeArray] = useState([]);
     const [timeSlot, setTimeSlot] = useState({});
@@ -49,11 +58,14 @@ export default function Schedule() {
         }
         const { backEndLink } = link;
         try {
-            let response = await axios.post(`${backEndLink}/user/checkAvailability`, {mockType : "dsa", timeSlot, userId : userDetails._id}, {
+            let response = await axios.post(`${backEndLink}/user/checkAvailability`, { mockType, timeSlot, userId: userDetails._id }, {
                 withCredentials: true
             })
+            if(response.data[0]=='Y'){
+                infoDisplay.current.style.display = "flex";
+            }
             console.log("Message :: ", response.data);
-            toast(response.data, {autoClose :  1500});
+            toast(response.data, { autoClose: 2000 });
         }
         catch (error) {
             console.log("messages :: ", error);
@@ -91,6 +103,9 @@ export default function Schedule() {
                 </div>
                 <br />
                 <button onClick={checkAvailiability} >Check Availability</button>
+            <div ref={infoDisplay} style={{display:"none"}} className="scheduleSuccess">
+                    <ScheduleSuccess infoDisplay={infoDisplay} mockType={mockType} timeSlot={timeSlot} />
+            </div>
             </div>
         </>
     );

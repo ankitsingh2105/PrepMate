@@ -10,6 +10,8 @@ import store from "./Components/Redux/Store/store"
 import Room from "./Components/VideoCalling/screens/Room"
 import DSAScreen from "./Components/DSAScreen/DSAScreen"
 import Schedule from "./Components/Schedule/Schedule"
+import UserProfile from "./Components/UserProfile/UserProfile"
+import About from "./Components/AboutSection/About";
 function App() {
 
   return (
@@ -19,12 +21,13 @@ function App() {
           <BrowserRouter>
             <Navbar />
             <Routes>
-              <Route path="/" element={<><Home /></>} />
+              <Route path="/" element={<><Home /><About/></>} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/dsaMock/room/:id" element={<DSAScreen />} />
               <Route path='/behMock/room/:id' element={<Room roomHeight={500} roomWidth={500} />} />
-              <Route path="/test" element = {<Schedule/>}/>
+              <Route path="/schedule" element = {<Schedule/>}/>
+              <Route path="/user/profile/:userName" element = {<UserProfile/>}/>
             </Routes>
           </BrowserRouter>
         </Provider>
@@ -34,3 +37,4 @@ function App() {
 }
 
 export default App
+ 

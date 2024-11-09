@@ -24,7 +24,7 @@ router.post("/", async (req, response) => {
             })
         }
 
-        const token = jwt.sign({ userName: userName }, 'ankit', { expiresIn: '1h' });
+        const token = jwt.sign({ userName: userName }, 'ankit', { expiresIn: '1d' });
 
         // httpOnly: true, // * :: Prevents client-side JavaScript from accessing the cookie
         response.cookie('token', token, {

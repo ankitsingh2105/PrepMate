@@ -11,6 +11,7 @@ const cookieParser = require("cookie-parser");
 const connect = require("./connect");
 
 const { Server } = require("socket.io");
+const mockModel = require("./Model/mockModel");
 
 const io = new Server(8000, {
   cors: true
@@ -38,17 +39,13 @@ app.use("/user", userRouter);
 app.listen(3000, () => {
   console.log("listening to port 3000");
 })
- 
-
-
 
 io.on("connection", (socket) => {
 
   socket.on("room:join", ({ email, room }) => {
     const data = { email, room, socketID: socket.id };
 
-    // joining the room  
-    socket.join(room);  // Pass the room name here
+    socket.join(room);
 
     // sending message to the room 
     io.to(room).emit("user:joined", data);
@@ -83,12 +80,12 @@ io.on("connection", (socket) => {
 
 });
 
-// todo :: socket connection for chatting
-const ioForChat = new Server(9000, {
+// todo :: socket connection for code edit
+const ioForCodeEdit = new Server(9000, {
   cors: true
 });
 
-ioForChat.on("connection", (socket) => {
+ioForCodeEdit.on("connection", (socket) => {
 
   socket.on("joinRoom", (room) => {
     socket.join(room);
@@ -96,7 +93,50 @@ ioForChat.on("connection", (socket) => {
 
 
   socket.on("user:codeChange", ({ room, sourceCode }) => {
-    ioForChat.to(room).emit("user:codeChangeAccepted", { sourceCode });
+    ioForCodeEdit.to(room).emit("user:codeChangeAccepted", { sourceCode });
   })
 
-}) 
+})
+
+
+// todo : socket server for notification
+
+const ioForNotification = new Server(9001, {
+  cors: true
+})
+
+let userSocketMap = new Map();
+
+ioForNotification.on("connection", (socket) => {
+  console.log('User connected: ' + socket.id);
+
+  socket.on('register', (userId) => {
+    // Map userId to socketId in your map
+    userSocketMap.set(userId, socket.id);
+    console.log(userSocketMap);  // Map logged here
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected: ' + socket.id);
+    // Remove the mapping on disconnect if necessary
+    userSocketMap.delete(socket.id);
+  });
+
+  socket.on("notification", ({ message, otherUserId }) => {
+    console.log("Notification received", message, otherUserId);
+    console.log("userSocketMap", userSocketMap);
+
+    // Access the socket ID from the map using .get
+    const otherUserSocketId = userSocketMap.get(otherUserId);
+    console.log("opo >> ", otherUserSocketId);
+
+    if (otherUserSocketId) {
+      console.log("sending message");
+      ioForNotification.to(otherUserSocketId).emit("notification", {message});
+    }
+    else {
+      console.log(`User with ID ${otherUserId} is not connected.`);
+    }
+  })
+});
+

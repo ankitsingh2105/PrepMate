@@ -6,9 +6,9 @@ const UserSchema = new mongoose.Schema({
         required: true,
         unique: true,
     },
-    name : {
-        type : String,
-        required : true
+    name: {
+        type: String,
+        required: true
     },
     email: {
         type: String,
@@ -22,8 +22,8 @@ const UserSchema = new mongoose.Schema({
     bio: {
         type: String,
     },
-    bookings : {
-        type : Array
+    bookings: {
+        type: Array
     }
 });
 
