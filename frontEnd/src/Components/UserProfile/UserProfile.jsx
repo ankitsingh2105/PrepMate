@@ -22,13 +22,13 @@ export default function UserProfile() {
     });
     const [bookings, setBookings] = useState([]);
     const [refresh, setRefresh] = useState(false);
-
+ 
     useEffect(() => {
         const fetchUserData = async () => {
             console.log("uerDetails are ::", userDetails);
             setUserData(userDetails);
             setBookings(userDetails.bookings);
-        };
+        }; 
         fetchUserData();
     }, []);
 

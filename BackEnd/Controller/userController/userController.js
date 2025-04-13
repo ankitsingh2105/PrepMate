@@ -18,6 +18,8 @@ async function handleUserInfo(req, response) {
 }
 
 
+const mongoose = require("mongoose");
+
 async function handleAvailability(req, response) {
     const { timeSlot, mockType, userId } = req.body;
     const { date, time } = timeSlot;
@@ -66,13 +68,13 @@ async function handleAvailability(req, response) {
                 let sameUser = await userModel.findOneAndUpdate(
                     { _id: userId },
                     {
-                        $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId : bookingId , otherUserTicketID } }
+                        $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId: bookingId, otherUserTicketID } }
                     }
                 );
                 let otherUser = await userModel.findOneAndUpdate(
                     { _id: idd },
                     {
-                        $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId : otherUserTicketID, otherUserTicketID : bookingId } }
+                        $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId: otherUserTicketID, otherUserTicketID: bookingId } }
                     }
                 );
 
@@ -109,8 +111,6 @@ async function handleAvailability(req, response) {
     }
 }
 
-
-
 function handleUserLogout(req, response) {
     console.log("logging out");
     response.clearCookie("token", {
@@ -142,11 +142,11 @@ async function handleCancelBooking(req, res) {
     const { myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime } = req.body;
     // todo :: go to both users and using ticket if remove the elemt of the booking array
     // * removing ticket entry from my side
-    try{
-        let response = await userModel.findOneAndUpdate({_id : myUserId},
+    try {
+        let response = await userModel.findOneAndUpdate({ _id: myUserId },
             {
-                $pull : {
-                    bookings : {
+                $pull: {
+                    bookings: {
                         otherUserTicketID
                     }
                 }
@@ -154,38 +154,38 @@ async function handleCancelBooking(req, res) {
             { new: true }
         )
     }
-    catch(error){
+    catch (error) {
         console.log("first error ::  ", error);
     }
     // * removing ticket entry other my side
-    try{
-        let response = await userModel.findOneAndUpdate({_id : otherUserId},
+    try {
+        let response = await userModel.findOneAndUpdate({ _id: otherUserId },
             {
-                $pull : {
-                    bookings : {
-                        myTicketId : otherUserTicketID
+                $pull: {
+                    bookings: {
+                        myTicketId: otherUserTicketID
                     }
                 }
             },
-            { new: true } 
+            { new: true }
         )
-    } 
-    catch(error){
+    }
+    catch (error) {
         console.log("second error ::  ", error);
     }
     // *remove the mock model from my side
-    try{
-        await mockModel.findOneAndDelete({_id : myTicketId})
+    try {
+        await mockModel.findOneAndDelete({ _id: myTicketId })
     }
-    catch(error){
-        console.log("third :: " , error);
+    catch (error) {
+        console.log("third :: ", error);
     }
     // *remove the mock model from the other side
-    try{
-        await mockModel.findOneAndDelete({_id : otherUserTicketID})
+    try {
+        await mockModel.findOneAndDelete({ _id: otherUserTicketID })
     }
-    catch(error){
-        console.log("fourth :: " , error);
+    catch (error) {
+        console.log("fourth :: ", error);
     }
     res.send("Booking cancelled");
 }

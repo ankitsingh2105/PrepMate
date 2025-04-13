@@ -18,25 +18,6 @@ function CodeEditor() {
     // todo :: chatting handled
     const lastSentCode = useRef('');  // * i need to track if the code is changed
 
-    const handleIncomingCode = (code) => {
-        if (code.sourceCode !== lastSentCode.current) { // Update only if different
-            console.log("Received code update:", code.sourceCode);
-            setSourceCode(code.sourceCode);
-        }
-    };
-
-    useEffect(() => {
-        socket.emit("joinRoom", room);
-    }, [socket])
-
-
-    useEffect(() => {
-        socket.on("user:codeChangeAccepted", handleIncomingCode);
-        return () => {
-            socket.off("user:codeChangeAccepted", handleIncomingCode)
-        }
-    }, [socket, handleIncomingCode])
-
     const handleEditorChange = (value) => {
         setSourceCode(value);
         lastSentCode.current = value;
@@ -71,7 +52,7 @@ function CodeEditor() {
 
     const submitCode = async () => {
         const encodedSourceCode = toBase64(sourceCode);
-        console.log("souurce code is :: " , sourceCode);
+        console.log("souurce code is :: ", sourceCode);
         const encodedInput = input ? toBase64(input) : '';
 
         const options = {
@@ -136,18 +117,49 @@ function CodeEditor() {
         try {
             const response = await axios.request(options);
             const decodedOutput = atob(response.data.stdout || '');
-            if(decodedOutput.length==0){
+            if (decodedOutput.length == 0) {
                 toast.error("Error in code");
                 return;
             }
             console.log("Execution result:", decodedOutput);
             setResult(decodedOutput);
+            await socket.emit("getOutput", { decodedOutput, room })
             setError('');
-        } catch (err) {
+        }
+        catch (err) {
             console.error(err);
             setError("Error fetching result");
         }
     }
+
+
+    const handleIncomingCode = (code) => {
+        if (code.sourceCode !== lastSentCode.current) {
+            console.log("Received code update:", code.sourceCode);
+            setSourceCode(code.sourceCode);
+        }
+    };
+
+    const handleIncomingOutput = ({decodedOutput}) => {
+        console.log("result :: ", decodedOutput)
+        setResult(decodedOutput)
+    }
+
+    useEffect(() => {
+        socket.emit("joinRoom", room);
+    }, [socket])
+
+
+    useEffect(() => {
+        socket.on("user:codeChangeAccepted", handleIncomingCode);
+
+        socket.on("getOutput", handleIncomingOutput);
+
+        return () => {
+            socket.off("user:codeChangeAccepted", handleIncomingCode)
+            socket.off("getOutput")
+        }
+    }, [socket, handleIncomingCode, handleIncomingOutput])
 
     return (
         <div className='mainDiv' >

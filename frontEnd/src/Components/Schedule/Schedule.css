@@ -46,3 +46,28 @@
     z-index: 1000;
     box-shadow: 1px 1px 30px rgb(104, 103, 103);
 }
+
+/* Customize scrollbar for WebKit browsers */
+::-webkit-scrollbar {
+    width: 12px;           /* Width of the entire scrollbar */
+  }
+  
+  /* Track styling */
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;   /* Background color of the scrollbar track */
+    border-radius: 10px;
+  }
+  
+  /* Scrollbar thumb styling */
+  ::-webkit-scrollbar-thumb {
+    background-color: #9500ff;    /* Color of the scrollbar thumb */
+    border-radius: 10px;       /* Round the thumb corners */
+    border: 3px solid #f1f1f1; /* Space around thumb */
+  }
+  
+  /* Hover effect for the thumb */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;          /* Darken color on hover */
+  }
+        /* Width for Firefox */
+  

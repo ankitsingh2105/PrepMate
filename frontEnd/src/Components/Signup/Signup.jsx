@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from "axios";
 import links from "../../connect";
+import { ToastContainer, toast } from "react-toastify"
 const Signup = () => {
     const { backEndLink } = links;
     const [email, setEmail] = useState('');
@@ -17,18 +18,19 @@ const Signup = () => {
                 email, userName, password, name
             }, { withCredentials: true });
 
-            console.log("resposne is :: ", response);
-            navigate("/");
+            navigate("/", { replace: true });
+            window.location.reload();
         }
         catch (error) {
-            console.log("error", error);
+            toast.error(error.response.data.message)
+            console.log(error.response.data.message);
         }
-        console.log({ name, email, userName, password });
     };
 
 
     return (
         <div className="flex items-center p-8 justify-center bg-gray-100">
+            <ToastContainer/>
             <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow-md w-96">
                 <h2 className="text-2xl font-bold mb-6 text-center text-purple-600">Sign Up</h2>
                 <div className="mb-4">

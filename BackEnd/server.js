@@ -52,7 +52,7 @@ io.on("connection", (socket) => {
 
     // send room join confirmation to the user who joined
     io.to(socket.id).emit("room:join", data);
-
+ 
   });
 
 
@@ -88,12 +88,17 @@ const ioForCodeEdit = new Server(9000, {
 ioForCodeEdit.on("connection", (socket) => {
 
   socket.on("joinRoom", (room) => {
-    socket.join(room);
+    socket.join(room); 
   });
 
 
   socket.on("user:codeChange", ({ room, sourceCode }) => {
     ioForCodeEdit.to(room).emit("user:codeChangeAccepted", { sourceCode });
+  })
+  
+  socket.on("getOutput", ({ decodedOutput, room }) => {
+    console.log(decodedOutput);
+    ioForCodeEdit.to(room).emit("getOutput", { decodedOutput });
   })
 
 })
@@ -132,7 +137,7 @@ ioForNotification.on("connection", (socket) => {
 
     if (otherUserSocketId) {
       console.log("sending message");
-      ioForNotification.to(otherUserSocketId).emit("notification", {message});
+      ioForNotification.to(otherUserSocketId).emit("notification", { message });
     }
     else {
       console.log(`User with ID ${otherUserId} is not connected.`);

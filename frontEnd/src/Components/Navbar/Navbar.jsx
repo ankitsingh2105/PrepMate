@@ -37,13 +37,13 @@ export default function Navbar() {
         }
     }
 
-     
+
 
     return (
         <>
             <nav class="flex items-center justify-between p-4 border-b">
                 <div class="flex items-center space-x-2" >
-                    <div class="bg-purple-600 text-white p-2 rounded"> 
+                    <div class="bg-purple-600 text-white p-2 rounded">
                     </div>
                     <span onClick={() => { navigate("/") }} className="cursor-pointer text-xl font-bold">
                         PrepMate
@@ -55,7 +55,9 @@ export default function Navbar() {
                         <button className=''>
                             Welcome <b>{userDetails.name.split(" ")[0]}</b>
                         </button>
-                        <button onClick={()=>{navigate(`/user/profile/${userDetails.userName}`)}} className='bg-purple-600 text-white px-3 py-1 rounded-full '>
+                        <button onClick={() => { navigate(`/user/profile/${userDetails.userName}` , {
+                            replace : true
+                        }); window.location.reload() }} className='bg-purple-600 text-white px-3 py-1 rounded-full '>
                             {userDetails.name[0]}
                         </button>
                         <button onClick={handleLogout} className='bg-purple-600 text-white px-3 py-1 rounded '>
@@ -64,7 +66,9 @@ export default function Navbar() {
                     </section>
                 ) : (
                     <section className='flex items-center justify-center space-x-4'>
-                        <button onClick={() => { navigate("/login") }} className=''>
+                        <button onClick={() => {
+                            navigate("/login")
+                        }} className=''>
                             Login
                         </button>
                         <button onClick={() => { navigate("/signup") }} className='bg-purple-600 text-white px-3 py-1 rounded'>

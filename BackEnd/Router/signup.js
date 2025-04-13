@@ -13,14 +13,14 @@ router.post("/", async (req, res) => {
         let user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({
-                message: "User already exists",
+                message: "User already with this email",
             });
         }
 
         user = new User({
             userName,
             email,
-            password, 
+            password,
             name
         });
 
@@ -42,7 +42,9 @@ router.post("/", async (req, res) => {
 
     } catch (error) {
         console.error(error.message);
-        res.status(500).send("Server error");
+        return res.status(400).json({
+            message: "User name taken",
+        });
     }
 });
 
