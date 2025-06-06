@@ -26,8 +26,6 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-
-
 connect("mongodb+srv://WHQMCNBYGhTTwIHN:ankitchauhan21500@cluster0.2ipp9om.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
 // connect("mongodb://127.0.0.1:27017/PrepMate");
 
@@ -55,18 +53,18 @@ io.on("connection", (socket) => {
 
     // send room join confirmation to the user who joined
     io.to(socket.id).emit("room:join", data);
-  
-  }); 
+
+  });
 
   // Listens for incoming call requests from other users
-  socket.on("user:call", ({ sendername, to, offer }) => { 
+  socket.on("user:call", ({ sendername, to, offer }) => {
     // Emit the incoming call event to the specified remote user
     io.to(to).emit("incoming:call", { sendername, from: socket.id, offer });
   });
 
   socket.on("call:accepted", ({ to, ans }) => {
     io.to(to).emit("call:accepted", { from: socket.id, ans });
-  }) 
+  })
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
     io.to(to).emit("peer:nego:needed", { from: socket.id, offer });
@@ -86,13 +84,13 @@ const ioForCodeEdit = new Server(9000, {
 ioForCodeEdit.on("connection", (socket) => {
 
   socket.on("joinRoom", (room) => {
-    socket.join(room); 
+    socket.join(room);
   });
 
   socket.on("user:codeChange", ({ room, sourceCode }) => {
     ioForCodeEdit.to(room).emit("user:codeChangeAccepted", { sourceCode });
   })
-  
+
   socket.on("getOutput", ({ decodedOutput, room }) => {
     console.log(decodedOutput);
     ioForCodeEdit.to(room).emit("getOutput", { decodedOutput });
