@@ -26,7 +26,10 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-connect("mongodb://127.0.0.1:27017/PrepMate");
+
+
+connect("mongodb+srv://WHQMCNBYGhTTwIHN:ankitchauhan21500@cluster0.2ipp9om.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+// connect("mongodb://127.0.0.1:27017/PrepMate");
 
 app.get("", (req, response) => {
   response.send("Api is working")
@@ -52,35 +55,30 @@ io.on("connection", (socket) => {
 
     // send room join confirmation to the user who joined
     io.to(socket.id).emit("room:join", data);
- 
-  });
+  
+  }); 
 
-
-  //todo:: Listens for incoming call requests from other users
-  socket.on("user:call", ({ sendername, to, offer }) => {
-
+  // Listens for incoming call requests from other users
+  socket.on("user:call", ({ sendername, to, offer }) => { 
     // Emit the incoming call event to the specified remote user
-    // Forward the call request with the offer to the remote user
     io.to(to).emit("incoming:call", { sendername, from: socket.id, offer });
   });
 
-
   socket.on("call:accepted", ({ to, ans }) => {
-    io.to(to).emit("call:accepted", ({ from: socket.id, ans }));
-  })
-
+    io.to(to).emit("call:accepted", { from: socket.id, ans });
+  }) 
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
     io.to(to).emit("peer:nego:needed", { from: socket.id, offer });
   })
 
   socket.on("peer:nego:done", ({ to, ans }) => {
-    io.to(to).emit("peer:nego:final", { from: socket.id, offer });
+    io.to(to).emit("peer:nego:final", { from: socket.id, ans });
   })
 
 });
 
-// todo :: socket connection for code edit
+// socket connection for code edit
 const ioForCodeEdit = new Server(9000, {
   cors: true
 });
@@ -90,7 +88,6 @@ ioForCodeEdit.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
     socket.join(room); 
   });
-
 
   socket.on("user:codeChange", ({ room, sourceCode }) => {
     ioForCodeEdit.to(room).emit("user:codeChangeAccepted", { sourceCode });
@@ -103,9 +100,7 @@ ioForCodeEdit.on("connection", (socket) => {
 
 })
 
-
-// todo : socket server for notification
-
+// socket server for notification
 const ioForNotification = new Server(9001, {
   cors: true
 })
@@ -118,7 +113,7 @@ ioForNotification.on("connection", (socket) => {
   socket.on('register', (userId) => {
     // Map userId to socketId in your map
     userSocketMap.set(userId, socket.id);
-    console.log(userSocketMap);  // Map logged here
+    console.log(userSocketMap);
   });
 
   socket.on('disconnect', () => {
@@ -131,7 +126,6 @@ ioForNotification.on("connection", (socket) => {
     console.log("Notification received", message, otherUserId);
     console.log("userSocketMap", userSocketMap);
 
-    // Access the socket ID from the map using .get
     const otherUserSocketId = userSocketMap.get(otherUserId);
     console.log("opo >> ", otherUserSocketId);
 
@@ -143,5 +137,4 @@ ioForNotification.on("connection", (socket) => {
       console.log(`User with ID ${otherUserId} is not connected.`);
     }
   })
-});
-
+});  

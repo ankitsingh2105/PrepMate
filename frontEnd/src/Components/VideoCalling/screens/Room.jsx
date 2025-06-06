@@ -1,30 +1,35 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import SocketProvider, { useSocket } from '../context/SocketProvider';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useSocket } from '../context/SocketProvider';
 import ReactPlayer from "react-player";
 import peer from '../service/peer';
 import { useLocation } from 'react-router-dom';
 import { useSelector } from "react-redux";
-import "./Room.css"
-import { ToastContainer, toast } from "react-toastify"
+import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function Room({ windowWidth, roomWidth, roomHeight, direction }) {
   const socket = useSocket();
-  const [remoteSocketId, setremoteSocketId] = useState("")
-  const [myStream, setmyStream] = useState(null);
-  const [loading, setLoding] = useState(false);
-  const [remoteStream, setremoteStream] = useState(null);
+  const [remoteSocketId, setRemoteSocketId] = useState("");
+  const [myStream, setMyStream] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [remoteStream, setRemoteStream] = useState(null);
   const [inComingCall, setInComingCall] = useState(false);
-  const [otherUsername, setOtherUserName] = useState("");
+  const [otherUsername, setOtherUsername] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioChunks, setAudioChunks] = useState([]);
+  const [transcript, setTranscript] = useState("");
+  const mediaRecorderRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const mixedStreamRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const tracksAddedRef = useRef(false);
 
-
-  // display invitation link
   const location = useLocation();
   console.log("path is :: ", location);
   const currentPageUrl = `http://localhost:5173${location.pathname}`;
   useEffect(() => {
-    toast("Copy the url and send to a friend", { autoClose: 1500 })
-  }, [])
+    toast("Copy the url and send to a friend", { autoClose: 1500 });
+  }, []);
 
   const userInfo = useSelector((state) => state.userInfo);
   const { userDetails } = userInfo;
@@ -33,7 +38,7 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
     const room = url.pathname.split("/")[2];
     if (userDetails && userDetails.email) {
       const email = userDetails.email;
-      setLoding(true);
+      setLoading(true);
       socket.emit("room:join", { email, room });
     }
   }, [userDetails, socket]);
@@ -44,175 +49,121 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
     }
   }, [userDetails, handleSubmit]);
 
-
   useEffect(() => {
-    // Define an asynchronous function to initialize the media stream
     const initializeStream = async () => {
       try {
-        // Request access to audio and video devices from the user
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: true
         });
-        // If access is granted, save the stream to state using setmyStream
-        setmyStream(stream);
-      }
-      catch (error) {
-        // Log an error if there was an issue accessing the media devices
-        console.error("Error accessing media devices.", error);
+        setMyStream(stream);
+        console.log("Initialized myStream with tracks:", stream.getTracks());
+      } catch (error) {
+        console.error("Error accessing media devices:", error);
+        toast.error("Failed to access media devices", { autoClose: 1500 });
       }
     };
 
-    // Call the function to initialize the stream when the component mounts
     initializeStream();
 
-    // Cleanup function to stop all media tracks when the component unmounts
     return () => {
       if (myStream) {
-        // Stop each track (audio/video) in the stream to free up resources
-        // The stop() method releases the audio and video tracks, freeing up resources. This is important because it ensures that the browser is no longer using the camera and microphone after the component is unmounted. Without stopping the tracks, the media devices would keep running in the background, which can cause resource leaks.
         myStream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []); // Empty dependency array means this effect runs only once, when the component mounts
-
-
-  // TODO : useCallback is a React hook that memoizes a function. This means it saves the function so that React doesn’t create a new version of it on every render.
+  }, []);
 
   const handleUserJoined = useCallback((data) => {
     const { email, room, socketID } = data;
-    console.log("New user joined with remote id::", data);
-    setremoteSocketId(socketID);
+    console.log("New user joined with remote id:", data);
+    setRemoteSocketId(socketID);
   }, []);
 
-
-  // todo :: calling the other user
   const handleCall = useCallback(async () => {
+    if (!myStream) {
+      toast.error("Local stream not available", { autoClose: 1500 });
+      return;
+    }
     console.log("Calling ...");
-
-    // Capture local media stream (audio and video)
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: true
-    });
-
-    // Create an SDP offer
     const offer = await peer.getOffer();
-
-    // Emit the offer to the remote user
-    // remoteSocketId - other new user in the room after i joined
     const name = userDetails.name;
     socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
+  }, [remoteSocketId, socket, userDetails, myStream]);
 
-    // Set the local media stream to state
-    setmyStream(stream);
-  }, [remoteSocketId, socket]);
-
-
-
-  // todo : incoming calls
   const handleIncomingCall = useCallback(async ({ sendername, from, offer }) => {
-    setOtherUserName(sendername);
-    console.log("and the oter user is ,  ::  ", sendername);
-    console.log("Incoming call from", from, offer);
+    if (!myStream) {
+      toast.error("Local stream not available", { autoClose: 1500 });
+      return;
+    }
+    setOtherUsername(sendername);
+    console.log("Incoming call from", sendername, from);
     setInComingCall(true);
-    // Capture local media stream (audio and video)
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: true
-    });
-
-    // Set remote socket ID and local media stream
-    setremoteSocketId(from);
-    setmyStream(stream);
-
-    // Create an SDP answer
+    setRemoteSocketId(from);
     const ans = await peer.getAnswer(offer);
-
-    // Emit the answer to the caller
     socket.emit("call:accepted", { to: from, ans });
-  }, []);
+  }, [socket, myStream]);
 
   const sendStreams = useCallback(() => {
-    // This loop iterates over all tracks in the myStream MediaStream, which can include
-    // audio, video, data channels, or any other custom media tracks. Each track is added
-    // to the RTCPeerConnection to be sent to the remote peer.
-    console.log("my stream is :: ", myStream);
-    if (!myStream || !myStream.getTracks()) return;
+    if (!myStream || !myStream.getTracks() || tracksAddedRef.current) return;
+    console.log("Adding tracks from myStream:", myStream.getTracks());
     for (const track of myStream.getTracks()) {
-      console.log("All the tracks:", track);
-      // Add each track to the RTCPeerConnection
       peer.webRTCPeer.addTrack(track, myStream);
     }
-
-    console.log("peer is :: ", peer);
-    console.log("peer.webRTCPeer is ::", peer.webRTCPeer)
+    tracksAddedRef.current = true;
   }, [myStream]);
 
-
-
   const handleAcceptCall = useCallback(({ from, ans }) => {
-    // todo ::  I am using setRemoteDescription because I'm receiving an answer from the other peer, which represents the remote session data for my peer connection
     peer.setRemoteDescription(ans);
     console.log("Call accepted from", from);
     sendStreams();
   }, [sendStreams]);
 
-
-  // todo :  In WebRTC, negotiation handles updates to the connection while it's active, like adding new streams or adjusting settings.
-
-  //todo:: Initial Setup: You create an offer and receive an answer to start the connection.
-
-  //todo :: Ongoing Changes: When changes are needed (e.g., adding a new stream), you need to renegotiate by creating a new offer and getting an answer again.
-
-  // todo ::This separation ensures that both initial setup and any dynamic updates are handled properly.
-
   const handleNegoNeeded = useCallback(async () => {
     const offer = await peer.getOffer();
-    socket.emit("peer:nego:needed", { offer, to: remoteSocketId })
-  }, [socket])
+    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
+  }, [socket, remoteSocketId]);
 
   const handleNegoNeededIncoming = useCallback(async ({ from, offer }) => {
     const ans = await peer.getAnswer(offer);
     socket.emit("peer:nego:done", { to: from, ans });
-  }, [socket])
+  }, [socket]);
 
   const handleNegoFinal = useCallback(async ({ ans }) => {
-    await peer.setLocalDescription(ans);
-  })
+    await peer.setRemoteDescription(ans);
+  }, []);
 
   useEffect(() => {
-    peer.webRTCPeer.addEventListener("negotiationneeded", handleNegoNeeded)
+    peer.webRTCPeer.addEventListener("negotiationneeded", handleNegoNeeded);
     return () => {
       peer.webRTCPeer.removeEventListener("negotiationneeded", handleNegoNeeded);
-    }
-  }, [])
+    };
+  }, [handleNegoNeeded]);
 
   useEffect(() => {
-    console.log(remoteStream);
     peer.webRTCPeer.addEventListener("track", async (e) => {
       const remoteStreams = e.streams;
-      console.log("remote streams :: ", remoteStreams);
-      if (!remoteStreams) return;
-      setremoteStream(remoteStreams[0])
-    })
-  }, [])
+      console.log("Received remote streams:", remoteStreams);
+      if (remoteStreams) {
+        setRemoteStream(remoteStreams[0]);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
     socket.on("incoming:call", handleIncomingCall);
     socket.on("call:accepted", handleAcceptCall);
     socket.on("peer:nego:needed", handleNegoNeededIncoming);
-    socket.on("peer:nego:final", handleNegoFinal)
+    socket.on("peer:nego:final", handleNegoFinal);
 
     return () => {
       socket.off("user:joined", handleUserJoined);
       socket.off("incoming:call", handleIncomingCall);
       socket.off("call:accepted", handleAcceptCall);
       socket.off("peer:nego:needed", handleNegoNeededIncoming);
-      socket.off("peer:nego:final", handleNegoFinal)
+      socket.off("peer:nego:final", handleNegoFinal);
     };
-  }, [socket, handleUserJoined, handleIncomingCall]);
+  }, [socket, handleUserJoined, handleIncomingCall, handleAcceptCall, handleNegoNeededIncoming, handleNegoFinal]);
 
   const handleCopy = (textToCopy) => {
     navigator.clipboard.writeText(textToCopy)
@@ -220,89 +171,251 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
         toast.success('Invite link copied to clipboard!', { autoClose: 1500 });
       })
       .catch((error) => {
-        console.error('Failed to copy text: ', error);
-        setCopySuccess('Failed to copy text.');
+        console.error('Failed to copy text:', error);
+        toast.error('Failed to copy text.', { autoClose: 1500 });
       });
   };
 
-
-  const placeCall = () => {
+  const placeCall = useCallback(() => {
     toast.success("Calling the other user", { autoClose: 5000 });
-  }
+    handleCall();
+    sendStreams();
+  }, [handleCall, sendStreams]);
+
+  const startRecording = useCallback(() => {
+    if (!myStream || !remoteStream) {
+      toast.error("Both streams are required to start recording", { autoClose: 1500 });
+      return;
+    }
+
+    try {
+      // Initialize AudioContext
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      const mixedStream = new MediaStream();
+
+      // Add local audio track
+      const localAudioTracks = myStream.getAudioTracks();
+      if (localAudioTracks.length > 0) {
+        const localSource = audioContextRef.current.createMediaStreamSource(myStream);
+        const localDest = audioContextRef.current.createMediaStreamDestination();
+        localSource.connect(localDest);
+        const localTrack = localDest.stream.getAudioTracks()[0];
+        if (localTrack) {
+          mixedStream.addTrack(localTrack);
+          console.log("Added local audio track:", localTrack);
+        }
+      } else {
+        console.warn("No audio tracks in myStream");
+        toast.warn("No local audio available", { autoClose: 1500 });
+      }
+
+      // Add remote audio track
+      const remoteAudioTracks = remoteStream.getAudioTracks();
+      if (remoteAudioTracks.length > 0) {
+        const remoteSource = audioContextRef.current.createMediaStreamSource(remoteStream);
+        const remoteDest = audioContextRef.current.createMediaStreamDestination();
+        remoteSource.connect(remoteDest);
+        const remoteTrack = remoteDest.stream.getAudioTracks()[0];
+        if (remoteTrack) {
+          mixedStream.addTrack(remoteTrack);
+          console.log("Added remote audio track:", remoteTrack);
+        }
+      } else {
+        console.warn("No audio tracks in remoteStream");
+        toast.warn("No remote audio available", { autoClose: 1500 });
+      }
+
+      // Verify mixed stream
+      const mixedTracks = mixedStream.getTracks();
+      console.log("Mixed stream tracks:", mixedTracks);
+      if (mixedTracks.length === 0) {
+        throw new Error("No audio tracks in mixed stream");
+      }
+
+      // Start MediaRecorder
+      mediaRecorderRef.current = new MediaRecorder(mixedStream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        console.log("MediaRecorder data available, size:", event.data.size);
+        if (event.data.size > 0) {
+          setAudioChunks((prev) => [...prev, event.data]);
+        } else {
+          console.warn("Received empty data chunk");
+        }
+      };
+      mediaRecorderRef.current.onerror = (event) => {
+        console.error("MediaRecorder error:", event.error);
+        toast.error("Recording error: " + event.error, { autoClose: 1500 });
+      };
+      mediaRecorderRef.current.start(1000); // Capture data every 1s
+      mixedStreamRef.current = mixedStream;
+      console.log("MediaRecorder started");
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      toast.error("Failed to start recording: " + error.message, { autoClose: 1500 });
+      return;
+    }
+
+    // Start speech recognition for local audio
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + ' ';
+          }
+        }
+        setTranscript((prev) => prev + finalTranscript);
+        console.log("Transcription update:", finalTranscript);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        toast.error(`Speech recognition error: ${event.error}`, { autoClose: 1500 });
+      };
+
+      recognitionRef.current.onend = () => {
+        if (isRecording) {
+          try {
+            recognitionRef.current.start();
+            console.log("Speech recognition restarted");
+          } catch (error) {
+            console.error("Error restarting speech recognition:", error);
+          }
+        }
+      };
+
+      try {
+        recognitionRef.current.start();
+        console.log("Speech recognition started");
+      } catch (error) {
+        console.error("Failed to start speech recognition:", error);
+        toast.error("Speech recognition failed: " + error.message, { autoClose: 1500 });
+      }
+    } else {
+      console.warn("Speech recognition not supported");
+      toast.warn("Speech recognition not supported in this browser", { autoClose: 1500 });
+    }
+
+    setIsRecording(true);
+    toast.success("Recording started", { autoClose: 1500 });
+  }, [myStream, remoteStream]);
+
+
 
   return (
-    <center style={{ width: windowWidth }} >
+    <div className="w-full text-center">
       <ToastContainer />
-      {
-        loading ?
-          <>
-            <small>Send this to a friend <div> http://localhost:5173{location.pathname} &nbsp; <i onClick={() => { handleCopy(currentPageUrl) }} class="fa-regular fa-copy"></i> </div></small>
-            <h3 className='isConnected' >{otherUsername && remoteSocketId.length != 0 ?
-              <>
-                <h1 style={{ backgroundColor: "rgb(76, 255, 76" }}>Connected</h1>
-              </>
-              :
-              <>
-                <h1 style={{ backgroundColor: "red", color: "white" }}>Disconnected</h1>
-              </>
-            }</h3>
-            {
-              otherUsername && remoteSocketId.length === 0 ? (
-                <></>
+      {loading ? (
+        <div className="flex flex-col items-center">
+          {/* Share link section */}
+          <div className="bg-purple-50 text-gray-700 py-2 px-4 rounded-lg shadow-sm mb-4 flex items-center justify-center space-x-2 w-auto max-w-md mx-auto">
+            <span className="text-sm font-medium">Share this link:</span>
+            <div className="flex items-center bg-white px-3 py-1 rounded border border-purple-200">
+              <span className="text-xs text-gray-600 truncate max-w-[200px]">
+                http://localhost:5173{location.pathname}
+              </span>
+              <button
+                onClick={() => handleCopy(currentPageUrl)}
+                className="ml-2 text-purple-600 hover:text-purple-800 transition-colors"
+                aria-label="Copy link"
+              >
+                <i className="fa-regular fa-copy"></i>
+              </button>
+            </div>
+          </div>
+
+          {/* Connection status */}
+          <div className="mb-4">
+            {otherUsername && remoteSocketId ? (
+              <div className="bg-green-500 text-white px-4 py-1 rounded-full inline-flex items-center">
+                <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                <span className="font-medium">Connected</span>
+              </div>
+            ) : (
+              <div className="bg-red-500 text-white px-4 py-1 rounded-full inline-flex items-center">
+                <div className="w-2 h-2 bg-white rounded-full mr-2"></div>
+                <span className="font-medium">Disconnected</span>
+              </div>
+            )}
+          </div>
+
+          {/* Call controls */}
+          {(!otherUsername || remoteSocketId) && (
+            <div className="flex justify-center space-x-4 mb-6">
+              <button
+                onClick={placeCall}
+                className="bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 rounded-full p-3 shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+              >
+                <i className="fa-solid fa-phone text-xl"></i>
+              </button>
+            </div>
+          )}
+
+          {/* Video streams */}
+          <main className={`flex items-center justify-center ${direction === 'column' ? 'flex-col' : 'flex-row'} gap-4`}>
+            {/* My video stream */}
+            {myStream && (
+              <div className="relative rounded-xl overflow-hidden shadow-lg border-2">
+                <ReactPlayer
+                  width={roomWidth}
+                  height={roomHeight}
+                  url={myStream}
+                  playing
+                  muted
+                />
+                <div className="absolute bottom-0 left-0 right-0 bg-red text-red py-1 px-3 text-sm font-semibold">
+                  You
+                </div>
+              </div>
+            )}
+
+            {/* Remote video stream */}
+            <div className="relative">
+              {inComingCall && remoteStream ? (
+                <div className="rounded-xl overflow-hidden shadow-lg border-2 border-purple-200">
+                  <ReactPlayer
+                    width={roomWidth}
+                    height={roomHeight}
+                    url={remoteStream}
+                    playing
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 text-black py-1 px-3 text-sm font-semibold">
+                    {otherUsername || 'Participant'}
+                  </div>
+                </div>
               ) : (
-                <center>
-                  <button onClick={() => {
-                    handleCall();
-                    sendStreams();
-                  }}>
-                    <i style={{ color: "#6b46c1" }} class="fa-solid fa-phone"></i>
-                    <br />
-                    <b onClick={placeCall} style={{ color: "#6b46c1" }} >Call</b>
-                  </button>
-                </center>
-              )
-            }
-            <main style={{ display: "flex", alignItems: "center", justifyContent: "center", flexDirection: direction }} >
-              <div>
-                {
-                  myStream ?
-                    <>
-                      <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={myStream} />
-
-                      <div style={{ marginTop: "-27px", fontWeight: "bolder" }} >You</div>
-                    </>
-                    :
-                    <>
-                    </>
-                }
-              </div>
-              <div>
-
-                {
-                  inComingCall && remoteStream ?
-                    <main style={{ margin: "10px" }} >
-                      <ReactPlayer width={roomWidth} height={roomHeight} playing={true} url={remoteStream} />
-                      <h1 style={{ marginTop: "-27px", fontWeight: "bolder" }}>{otherUsername}</h1>
-                    </main>
-                    :
-                    <>
-                      <div className='remoteUser' style={{ margin: "10px", width: roomWidth - 50, height: roomHeight - 110, marginTop: "30px" }} >
-                        Please wait for someone to enter the room
-                      </div>
-                    </>
-                }
-              </div>
-            </main>
-          </>
-          :
-          <>
-            <center>
-              <div style={{ marginTop: "50px" }} className="loader"></div>
-            </center>
-
-          </>
-      }
-    </center>
+                <div className="flex items-center justify-center bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 p-6"
+                  style={{
+                    width: roomWidth - 50,
+                    height: roomHeight - 110,
+                  }}
+                >
+                  <div className="text-center">
+                    <div className="text-gray-500 mb-2">
+                      <i className="fa-solid fa-user-plus text-4xl"></i>
+                    </div>
+                    <p className="text-gray-600 font-medium">Waiting for someone to join...</p>
+                    <p className="text-gray-500 text-sm mt-2">Share the link to invite a participant</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center h-screen">
+          <div className="flex flex-col items-center">
+            <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="mt-4 text-gray-600 font-medium">Loading video call...</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
-

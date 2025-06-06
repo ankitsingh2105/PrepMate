@@ -1,22 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Monaco from '@monaco-editor/react';
-import "./editor.css"
-import { useLocation } from "react-router-dom"
+import { useLocation } from 'react-router-dom';
 import { useSocketforChat } from '../../Components/VideoCalling/context/SocketProvider';
 import { toast } from 'react-toastify';
 
 function CodeEditor() {
-
     const socket = useSocketforChat();
-    let path = useLocation();
-    path = path.pathname;
+    const path = useLocation().pathname;
     const room = path.split("/")[2];
-    console.log("room is :: ", room);
+    const lastSentCode = useRef('');
 
+    const [sourceCode, setSourceCode] = useState('// code here\n\n');
+    const [compilerID, setLanguageId] = useState('52');
+    const [input, setInput] = useState('');
+    const [result, setResult] = useState('');
+    const [error, setError] = useState('');
+    const [token, setToken] = useState('');
 
-    // todo :: chatting handled
-    const lastSentCode = useRef('');  // * i need to track if the code is changed
+    const toBase64 = (str) => window.btoa(unescape(encodeURIComponent(str)));
 
     const handleEditorChange = (value) => {
         setSourceCode(value);
@@ -24,165 +26,115 @@ function CodeEditor() {
         socket.emit("user:codeChange", { room, sourceCode: value });
     };
 
-    const [sourceCode, setSourceCode] = useState(`//code here
-        
-
-
-
-
-
-
-
-
-
-
-
-
-    `);
-    const [compilerID, setLanguageId] = useState('52'); // C++ G++ ID
-    const [input, setInput] = useState('');
-    const [result, setResult] = useState('');
-    const [error, setError] = useState('');
-    const [token, setToken] = useState('');
-
-    // Base64 encoding function
-    const toBase64 = (str) => {
-        return window.btoa(unescape(encodeURIComponent(str)));
-    }
-
     const submitCode = async () => {
         const encodedSourceCode = toBase64(sourceCode);
-        console.log("souurce code is :: ", sourceCode);
         const encodedInput = input ? toBase64(input) : '';
 
-        const options = {
-            method: 'POST',
-            url: 'https://judge0-ce.p.rapidapi.com/submissions',
-            params: {
-                base64_encoded: 'true',
-                wait: 'false',
-                fields: '*'
-            },
-            headers: {
-                'x-rapidapi-key': '76289c78bbmsh0e35bfabb04cff4p1a92c0jsnae7e4fb869f3',
-                'x-rapidapi-host': 'judge0-ce.p.rapidapi.com',
-                'Content-Type': 'application/json'
-            },
-            data: {
-                language_id: compilerID,
-                source_code: encodedSourceCode,
-                stdin: encodedInput
-            }
-        };
-
         try {
-            const response = await axios.request(options);
-            console.log("Token received:", response.data.token);
+            const response = await axios.post(
+                'https://judge0-ce.p.rapidapi.com/submissions',
+                {
+                    language_id: compilerID,
+                    source_code: encodedSourceCode,
+                    stdin: encodedInput
+                },
+                {
+                    params: { base64_encoded: 'true', wait: 'false', fields: '*' },
+                    headers: {
+                        'x-rapidapi-key': '76289c78bbmsh0e35bfabb04cff4p1a92c0jsnae7e4fb869f3',
+                        'x-rapidapi-host': 'judge0-ce.p.rapidapi.com',
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
             setToken(response.data.token);
+            toast.success("Code submitted. Click on 'Get Result'.");
         } catch (err) {
             console.error(err);
             setError("Error submitting code");
+            toast.error("Submission failed");
         }
-
-        console.log("Fetching result for token:", token);
-        if (!token) {
-            setError("Please try again");
-            toast.error("Something went wrong");
-            return;
-        }
-        toast.success("Code Submitted, tap on  Get result");
-
-    }
+    };
 
     const getResult = async () => {
-        console.log("Fetching result for token:", token);
         if (!token) {
             setError("No token available. Please submit the code first.");
             return;
         }
 
-        const options = {
-            method: 'GET',
-            url: `https://judge0-ce.p.rapidapi.com/submissions/${token}`,
-            params: {
-                base64_encoded: 'true',
-                fields: '*'
-            },
-            headers: {
-                'x-rapidapi-key': '76289c78bbmsh0e35bfabb04cff4p1a92c0jsnae7e4fb869f3',
-                'x-rapidapi-host': 'judge0-ce.p.rapidapi.com'
-            }
-        };
-
         try {
-            const response = await axios.request(options);
+            const response = await axios.get(
+                `https://judge0-ce.p.rapidapi.com/submissions/${token}`,
+                {
+                    params: { base64_encoded: 'true', fields: '*' },
+                    headers: {
+                        'x-rapidapi-key': '76289c78bbmsh0e35bfabb04cff4p1a92c0jsnae7e4fb869f3',
+                        'x-rapidapi-host': 'judge0-ce.p.rapidapi.com'
+                    }
+                }
+            );
             const decodedOutput = atob(response.data.stdout || '');
-            if (decodedOutput.length == 0) {
+            if (!decodedOutput.trim()) {
                 toast.error("Error in code");
                 return;
             }
-            console.log("Execution result:", decodedOutput);
             setResult(decodedOutput);
-            await socket.emit("getOutput", { decodedOutput, room })
+            socket.emit("getOutput", { decodedOutput, room });
             setError('');
-        }
-        catch (err) {
+        } catch (err) {
             console.error(err);
             setError("Error fetching result");
         }
-    }
-
+    };
 
     const handleIncomingCode = (code) => {
         if (code.sourceCode !== lastSentCode.current) {
-            console.log("Received code update:", code.sourceCode);
             setSourceCode(code.sourceCode);
         }
     };
 
-    const handleIncomingOutput = ({decodedOutput}) => {
-        console.log("result :: ", decodedOutput)
-        setResult(decodedOutput)
-    }
+    const handleIncomingOutput = ({ decodedOutput }) => {
+        setResult(decodedOutput);
+    };
 
     useEffect(() => {
         socket.emit("joinRoom", room);
-    }, [socket])
-
+    }, [socket]);
 
     useEffect(() => {
         socket.on("user:codeChangeAccepted", handleIncomingCode);
-
         socket.on("getOutput", handleIncomingOutput);
-
         return () => {
-            socket.off("user:codeChangeAccepted", handleIncomingCode)
-            socket.off("getOutput")
-        }
-    }, [socket, handleIncomingCode, handleIncomingOutput])
+            socket.off("user:codeChangeAccepted", handleIncomingCode);
+            socket.off("getOutput");
+        };
+    }, [socket]);
 
     return (
-        <div className='mainDiv' >
-            <select
-                value={compilerID}
-                onChange={(e) => setLanguageId(e.target.value)}
-            >
-                <option value="52">C++</option>
-                <option value="62">Java</option>
-                <option value="63">JavaScript</option>
-                <option value="71">Python</option>
-            </select>
-            <br />
-            <main className='editor' >
+        <div className="p-4 max-w-5xl mx-auto">
+            <div className="mb-4">
+                <select
+                    className="p-2 bg-purple-600 text-white rounded shadow"
+                    value={compilerID}
+                    onChange={(e) => setLanguageId(e.target.value)}
+                >
+                    <option value="52">C++</option>
+                    <option value="62">Java</option>
+                    <option value="63">JavaScript</option>
+                    <option value="71">Python</option>
+                </select>
+            </div>
+
+            <div className="shadow-lg rounded border overflow-hidden mb-4">
                 <Monaco
-                    height="250px"
-                    width="800px"
+                    height="300px"
+                    width="700px"
                     defaultLanguage="cpp"
                     value={sourceCode}
                     onChange={handleEditorChange}
                     options={{
                         theme: 'vs-light',
-                        fontSize: 13,
+                        fontSize: 14,
                         lineNumbers: 'on',
                         wordWrap: 'on',
                         autoClosingBrackets: 'always',
@@ -191,23 +143,35 @@ function CodeEditor() {
                         tabSize: 4,
                     }}
                 />
-            </main>
+            </div>
 
             <textarea
-                placeholder="Enter the input here"
+                className="w-full p-3 border rounded shadow-sm mb-4"
+                placeholder="Enter input here"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                rows="4"
-                cols="50"
+                rows={2}
             />
-            <br />
-            <button onClick={submitCode}>Submit</button>
-            &nbsp;
-            <button onClick={getResult}>Get Result</button>
-            <div className='finalResult' >
-                <b>Output</b>
-                <pre>{result}</pre>
-                {error && <p style={{ color: 'red' }}>{error}</p>}
+
+            <div className="flex gap-4 mb-4">
+                <button
+                    className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
+                    onClick={submitCode}
+                >
+                    Submit
+                </button>
+                <button
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                    onClick={getResult}
+                >
+                    Get Result
+                </button>
+            </div>
+
+            <div className="bg-gray-100 p-4 rounded shadow-sm">
+                <h3 className="font-semibold mb-2 text-lg">Output</h3>
+                <pre className="whitespace-pre-wrap">{result}</pre>
+                {error && <p className="text-red-600 mt-2">{error}</p>}
             </div>
         </div>
     );

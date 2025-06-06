@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import connectJs from "../../connect";
 import axios from "axios";
 import "./UserProfile.css"
-import image from "./image.png"
 import { toast, ToastContainer } from "react-toastify"
 import io from "socket.io-client"
 import { useDispatch, useSelector } from 'react-redux';
 import { handleUserInfo } from '../Redux/Slices/userInfoSlice';
+import { FiCalendar, FiClock, FiTrash2, FiAlertCircle } from 'react-icons/fi';
+
 
 export default function UserProfile() {
 
@@ -22,42 +23,16 @@ export default function UserProfile() {
     });
     const [bookings, setBookings] = useState([]);
     const [refresh, setRefresh] = useState(false);
- 
+
     useEffect(() => {
         const fetchUserData = async () => {
             console.log("uerDetails are ::", userDetails);
             setUserData(userDetails);
             setBookings(userDetails.bookings);
-        }; 
+        };
         fetchUserData();
-    }, []);
+    }, [userDetails]);
 
-
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setUserData({ ...userData, [name]: value });
-    };
-
-    const handleImageChange = () => {
-        console.log("upload image")
-    }
-
-    const handleUserInfoUpdate = async () => {
-        console.log(userData);
-        const { email, name, bio } = userData;
-        try {
-            let response = await axios.patch(`${backEndLink}/user/updateInformation`, {
-                email, name, bio
-            }, {
-                withCredentials: true
-            })
-            console.log(response);
-        }
-        catch (error) {
-            console.log(error);
-        }
-    }
     const dispatch = useDispatch();
     useEffect(() => {
         dispatch(handleUserInfo());
@@ -66,7 +41,7 @@ export default function UserProfile() {
     const socket = io('http://localhost:9001');
 
     const handleBookingCancel = async (myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime) => {
-        console.log("op :: ", myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime) ;
+        console.log("op :: ", myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime);
         try {
             await axios.post(`${backEndLink}/user/cancelBooking`,
                 { myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime },
@@ -79,6 +54,31 @@ export default function UserProfile() {
         }
         catch (error) {
             console.log("Error cancelling booking:", error);
+        }
+    };
+
+    const formatDate = (dateTimeString) => {
+        try {
+            const date = new Date(dateTimeString);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+            });
+        } catch (e) {
+            return dateTimeString;
+        }
+    };
+
+    const formatTime = (dateTimeString) => {
+        try {
+            const date = new Date(dateTimeString);
+            return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return '';
         }
     };
 
@@ -102,103 +102,94 @@ export default function UserProfile() {
         };
     }, [socket, dispatch]);
 
-
-
     return (
-        <main className='userProfileMain' >
-            <ToastContainer />
-            {/* <section className="flex flex-row items-center  p-6 firstSection"> */}
+    <>
+            <ToastContainer position="top-right" autoClose={3000} />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
+            <section className="bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all hover:shadow-2xl duration-300 border border-purple-100">
+                <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-5">
+                    <h3 className="text-2xl font-extrabold text-white flex items-center">
+                        <FiCalendar className="mr-2" />
+                        Your Booking List
+                    </h3>
+                    <p className="text-purple-100 mt-1">Manage your upcoming mock interviews</p>
+                </div>
 
-            <section className="secondSection">
+                <div className="p-6">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-4 p-4 bg-purple-50 rounded-lg shadow-sm font-semibold text-purple-900 sticky top-0 z-10">
+                            <span className="flex text-center">#</span>
+                            <span className="flex text-center">Interview Type</span>
+                            <span className="flex text-center">Schedule</span>
+                            <span className="flex text-center">Action</span>
+                        </div>
 
-                <br /><br />
-                <h3 className="text-xl font-bold text-purple-600 mb-4">Booking List</h3>
+                        {bookings && bookings.length > 0 ? (
+                            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
+                                {bookings.map((booking, index) => (
+                                    <div
+                                        key={index}
+                                        className="grid grid-cols-4 p-4 bg-white border border-gray-100 rounded-xl hover:bg-purple-50 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-md"
+                                    >
+                                        <span className="flex text-center">
+                                            <span className="h-7 w-7 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-sm">
+                                                {index + 1}
+                                            </span>
+                                        </span>
 
+                                        <span className="text-center font-medium text-gray-800 flex items-center">
+                                            <span className={`inline-block w-2 h-2 rounded-full mr-2 ${booking.mockType === "DSA" ? "bg-blue-500" : "bg-green-500"}`}></span>
+                                            {booking.mockType === "DSA" ? "Data Structure & Algorithms" : "Behavioral Interview"}
+                                        </span>
 
-                <div className="m-4">
-                    <div className="bookingDetails p-4 border border-gray-300 rounded shadow-sm font-medium text-purple-600">
-                        <b>S.No</b>
-                        <b>Mock Type</b>
-                        <b>Date and Time</b>
-                        <b>Cancel</b>
-                    </div>
-                    {bookings && bookings?.length ? (
-                        bookings.map((booking, index) => (
-                            <div key={index} className="bookingDetails p-4 border border-gray-300 rounded shadow-sm">
-                                <b className='text-purple-600'>{index + 1}.</b>
-                                <b>{booking.mockType === "DSA" ? "Data Structure and Algorithm" : "Behavioural Round"}</b>
-                                <b>{booking.bookingTime}</b>
-                                <p
-                                    className="text-red-500 cursor-pointer"
-                                    onClick={() => handleBookingCancel(booking.myUserId, booking.otherUserId, booking.myTicketId, booking.otherUserTicketID, booking.mockType, booking.bookingTime)}
-                                >
-                                    Cancel
-                                </p>
+                                        <span className="text-center text-gray-700 flex flex-col">
+                                            <span className="flex items-center text-sm font-medium">
+                                                <FiCalendar className="mr-1 text-purple-600" />
+                                                {formatDate(booking.bookingTime)}
+                                            </span>
+                                            <span className="flex items-center text-xs text-gray-500 mt-1">
+                                                <FiClock className="mr-1" />
+                                                {formatTime(booking.bookingTime)}
+                                            </span>
+                                        </span>
+
+                                        <div className=" text-center flex items-center">
+                                            <button
+                                                disabled={loading}
+                                                className="text-red-600 hover:text-white hover:bg-red-600 font-medium rounded-lg px-3 py-1.5 transition-colors duration-200 flex items-center border border-red-200 hover:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+                                                onClick={() => handleBookingCancel(
+                                                    booking.myUserId,
+                                                    booking.otherUserId,
+                                                    booking.myTicketId,
+                                                    booking.otherUserTicketID,
+                                                    booking.mockType,
+                                                    booking.bookingTime
+                                                )}
+                                            >
+                                                <FiTrash2 className="mr-1" />
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))
-
-                    ) : (
-                        <center className="text-gray-600 mt-3">No bookings available.</center>
-                    )}
-                </div>
-
-                <br /><br />
-
-
-
-            </section>
-
-
-            <section style={{ boxShadow: "0px 0px 10px gray" }} className="userProfileEdit">
-
-                <div className="bg-white w-full max-w-lg p-8 rounded-lg shadow-md">
-                    <h2 className="text-2xl font-bold text-center text-purple-600 mb-6">User Profile</h2>
-
-                    <div className="mb-4">
-                        <label className="block text-gray-700">Name</label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={userData.name}
-                            onChange={handleInputChange}
-                            className="mt-1 block w-full p-2 border border-gray-300 rounded"
-                        />
+                        ) : (
+                            <div className="bg-gray-50 rounded-xl p-8 text-center border border-dashed border-gray-300">
+                                <div className="flex flex-col items-center justify-center space-y-3">
+                                    <FiAlertCircle className="text-4xl text-gray-400" />
+                                    <p className="text-gray-600 font-medium">No bookings available</p>
+                                    <p className="text-gray-500 text-sm max-w-xs">
+                                        You don't have any upcoming mock interviews scheduled. Book one to prepare for your next opportunity.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                    <div className="mb-4">
-                        <label className="block text-gray-700">Bio</label>
-                        <textarea
-                            name="bio"
-                            value={userData.bio}
-                            onChange={handleInputChange}
-                            className="mt-1 block w-full p-2 border border-gray-300 rounded"
-                            placeholder={userData.bio}
-                        ></textarea>
-                    </div>
-
-                    <div className="mb-6">
-                        <label className="block text-gray-700">Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={userData.email}
-                            onChange={handleInputChange}
-                            className="mt-1 block w-full p-2 border border-gray-300 rounded"
-                        />
-                    </div>
-                    <center>
-                        <button onClick={handleUserInfoUpdate}>
-                            Update Information
-                        </button>
-                    </center>
                 </div>
             </section>
-            <br /><br />
-
-            {/* </section> */}
-
-
         </main>
+    </>
     );
+
 }
