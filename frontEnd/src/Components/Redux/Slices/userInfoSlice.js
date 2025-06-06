@@ -5,10 +5,15 @@ import link from "../../../connect";
 
 export const handleUserInfo = createAsyncThunk("/getUserInfo", async () => {
     const { backEndLink } = link;
-    const response = await axios.get(`${backEndLink}/user/getInfo`, {
-        withCredentials: true,
-    });
-    return response.data ;
+    try{
+        const response = await axios.get(`${backEndLink}/user/getInfo`, {
+            withCredentials: true,
+        });
+        return response.data ;
+    }
+    catch(e){
+        console.log(e);
+    }
 })
 
 const userInfoSlice = createSlice({

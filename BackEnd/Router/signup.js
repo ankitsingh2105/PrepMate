@@ -34,7 +34,7 @@ router.post("/", async (req, res) => {
 
         res.cookie('token', token, {
             httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
-            secure: false,  // Set to true if you're using HTTPS
+            sameSite: "None"
         });
         res.status(201).json({
             message: "SignUp successfull",

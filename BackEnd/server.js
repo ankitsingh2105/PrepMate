@@ -19,7 +19,7 @@ const io = new Server(8000, {
 
 // middlewares
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: ["http://localhost:5173", "https://prep-mate-one.vercel.app"],
   credentials: true
 }));
 
