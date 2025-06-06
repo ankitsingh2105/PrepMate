@@ -33,8 +33,9 @@ router.post("/", async (req, res) => {
         const token = jwt.sign({ userName: userName }, 'ankit', { expiresIn: '1h' });
 
         res.cookie('token', token, {
-            httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
-            sameSite: "None"
+            httpOnly: true,
+            sameSite: "None",
+            secure : true
         });
         res.status(201).json({
             message: "SignUp successfull",

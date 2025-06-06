@@ -29,7 +29,8 @@ router.post("/", async (req, response) => {
         // httpOnly: true, // * :: Prevents client-side JavaScript from accessing the cookie
         response.cookie('token', token, {
             httpOnly: true,
-            sameSite: "None"
+            sameSite: "None",
+            secure : true
         });
 
         response.json({
