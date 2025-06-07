@@ -107,8 +107,7 @@ export default function Schedule() {
       );
       console.log(response.data);
       if (response.data[0] === 'Y') {
-        infoDisplay.current.style.display = "flex";
-        toast.success("Time slot is available!", { autoClose: 2000 });
+        toast.warning(`${response.data}`, { autoClose: 2000 });
       } else {
         toast.warning(response.data, { autoClose: 3000 });
       }
