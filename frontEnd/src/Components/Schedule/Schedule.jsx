@@ -105,7 +105,7 @@ export default function Schedule() {
         }, 
         { withCredentials: true }
       );
-      
+      console.log(response.data);
       if (response.data[0] === 'Y') {
         infoDisplay.current.style.display = "flex";
         toast.success("Time slot is available!", { autoClose: 2000 });
