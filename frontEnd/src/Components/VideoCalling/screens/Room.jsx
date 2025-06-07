@@ -318,8 +318,9 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
             <span className="text-sm font-medium">Share this link:</span>
             <div className="flex items-center bg-white px-3 py-1 rounded border border-purple-200">
               <span className="text-xs text-gray-600 truncate max-w-[200px]">
-                http://localhost:5173{location.pathname}
+                http://https://prep-mate-one.vercel.app{location.pathname}
               </span>
+              {/* https://prep-mate-one.vercel.app/dsaMock/room/Rn0eIrr3US */}
               <button
                 onClick={() => handleCopy(currentPageUrl)}
                 className="ml-2 text-purple-600 hover:text-purple-800 transition-colors"
