@@ -107,10 +107,14 @@ export default function Schedule() {
       );
       console.log(response.data);
       if (response.data.code == 1) {
-        toast.warning(`${response.data}`, { autoClose: 2000 });
-        return;
+        toast.warning(`${response.data.message}`, { autoClose: 2000 });
       }
-      toast.success(`${response.data}`, { autoClose: 2000 });
+      else if(response.data.code == 2){
+        toast.success(`${response.data.message}`, { autoClose: 2000 });
+      }
+      else{
+        toast.info(`${response.data.message}`, { autoClose: 4000 });
+      }
       return;
     }
     catch (error) {
