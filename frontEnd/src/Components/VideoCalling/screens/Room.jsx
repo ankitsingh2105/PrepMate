@@ -26,7 +26,7 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
 
   const location = useLocation();
   console.log("path is :: ", location);
-  const currentPageUrl = `http://localhost:5173${location.pathname}`;
+  const currentPageUrl = `https://prep-mate-one.vercel.app${location.pathname}`;
   useEffect(() => {
     toast("Copy the url and send to a friend", { autoClose: 1500 });
   }, []);
@@ -318,7 +318,7 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
             <span className="text-sm font-medium">Share this link:</span>
             <div className="flex items-center bg-white px-3 py-1 rounded border border-purple-200">
               <span className="text-xs text-gray-600 truncate max-w-[200px]">
-                http://https://prep-mate-one.vercel.app{location.pathname}
+                http://prep-mate-one.vercel.app{location.pathname}
               </span>
               {/* https://prep-mate-one.vercel.app/dsaMock/room/Rn0eIrr3US */}
               <button
