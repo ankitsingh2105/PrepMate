@@ -115,7 +115,7 @@ function handleUserLogout(req, response) {
     console.log("logging out");
     response.clearCookie("token", {
         httpOnly: true,
-        secure: false,
+        secure: true,
         sameSite: "None",
     }).send();
 }
