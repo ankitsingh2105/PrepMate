@@ -36,7 +36,10 @@ async function handleAvailability(req, response) {
 
         if (existingBooking) {
             console.log("Booking already exists for this user, mock type, and schedule.");
-            return response.send("You cannot book two entries for the same time");
+            return response.send({
+                message: "You cannot book two entries for the same time",
+                code: 1
+            });
         }
 
         // Step 2: Attempt to lock a conflicting booking for another user (atomic operation)
@@ -82,7 +85,10 @@ async function handleAvailability(req, response) {
                 console.log("found the other user :: ", otherUser);
                 console.log("found the other user :: ", sameUser);
                 console.log("Matching booking found for another user, locking it temporarily.");
-                response.send("Your booking is confirmed, please check your profile");
+                return response.send({
+                    message: "Your booking is confirmed, please check your profile",
+                    code: 2
+                });
             }
             catch (error) {
                 console.log("found the other user error :: ", error);
