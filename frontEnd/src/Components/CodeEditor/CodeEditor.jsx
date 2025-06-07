@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Monaco from '@monaco-editor/react';
 import { useLocation } from 'react-router-dom';
-import { useSocketforChat } from '../../Components/VideoCalling/context/SocketProvider';
+import { useSocketforCode } from '../../Components/VideoCalling/context/SocketProvider';
 import { toast } from 'react-toastify';
 
 function CodeEditor() {
-    const socket = useSocketforChat();
+    const socket = useSocketforCode();
     const path = useLocation().pathname;
     const room = path.split("/")[2];
     const lastSentCode = useRef('');

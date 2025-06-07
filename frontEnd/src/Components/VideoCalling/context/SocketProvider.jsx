@@ -9,21 +9,20 @@ export const useSocket = () => {
     const socket = useContext(SocketContext);
     return socket;
 }
-export const useSocketforChat = () => {
-    const socketForChat = useContext(SocketContextForChat);
-    return socketForChat;
+export const useSocketforCode = () => {
+    const socketForCode = useContext(SocketContextForChat);
+    return socketForCode;
 }
 // http://192.168.0.118:5173/
 
 export default function SocketProvider(props) {
     const { backEndLink } = connectJs;
     const socket = useMemo(() => io(`${backEndLink}/interview`), []);
-    const socketForChat = useMemo(() => io(`${backEndLink}/chat`), []);
-
+    const socketForCode = useMemo(() => io(`${backEndLink}/code-edit`), []);
 
     return (
         <SocketContext.Provider value={socket}>
-            <SocketContextForChat.Provider value={socketForChat}>
+            <SocketContextForChat.Provider value={socketForCode}>
                 {props.children}
             </SocketContextForChat.Provider>
         </SocketContext.Provider>
