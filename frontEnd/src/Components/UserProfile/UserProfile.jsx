@@ -38,7 +38,7 @@ export default function UserProfile() {
         dispatch(handleUserInfo());
     }, [refresh, dispatch]);
 
-    const socket = io('http://localhost:9001');
+    const socket = io(`${backEndLink}/notification`);
 
     const handleBookingCancel = async (myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime) => {
         console.log("op :: ", myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime);

@@ -3,6 +3,7 @@ import React from 'react'
 import { io } from "socket.io-client"
 const SocketContext = createContext(null);
 const SocketContextForChat = createContext(null);
+import connectJs from "../../../connect";
 
 export const useSocket = () => {
     const socket = useContext(SocketContext);
@@ -15,8 +16,10 @@ export const useSocketforChat = () => {
 // http://192.168.0.118:5173/
 
 export default function SocketProvider(props) {
-    const socket = useMemo(() => io("http://localhost:8000"), []);
-    const socketForChat = useMemo(() => io("http://localhost:9000"), []);
+    const { backEndLink } = connectJs;
+    const socket = useMemo(() => io(`${backEndLink}/interview`), []);
+    const socketForChat = useMemo(() => io(`${backEndLink}/chat`), []);
+
 
     return (
         <SocketContext.Provider value={socket}>
