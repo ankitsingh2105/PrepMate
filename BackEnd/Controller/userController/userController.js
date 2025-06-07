@@ -106,7 +106,10 @@ async function handleAvailability(req, response) {
                 user: userId
             });
             await newMockModel.save();
-            response.send("No one to schedule we are adding you for booking");
+            response.send({
+                message : "No one to schedule we are adding you for booking",
+                code : 3,
+            });
         }
 
     }
