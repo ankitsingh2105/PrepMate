@@ -16,6 +16,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const [inComingCall, setInComingCall] = useState(false);
     const [otherUsername, setOtherUsername] = useState("");
     const tracksAddedRef = useRef(false);
+    const pendingCallRef = useRef(null);
 
     const location = useLocation();
     const currentPageUrl = `https://prep-mate-one.vercel.app${location.pathname}`;
@@ -27,47 +28,54 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const { userDetails } = userInfo;
     const url = useLocation();
 
+    const initializeStream = useCallback(async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true
+            });
+            setMyStream(stream);
+            console.log("Initialized myStream with tracks:", stream.getTracks());
+            toast.success("Local stream initialized", { autoClose: 1500 });
+            return stream;
+        } catch (error) {
+            console.error("Error accessing media devices:", error);
+            toast.error("Failed to access media devices", { autoClose: 1500 });
+            return null;
+        }
+    }, []);
+
     const handleSubmit = useCallback(() => {
         const room = url.pathname.split("/")[2];
         if (userDetails && userDetails.email) {
             const email = userDetails.email;
             setLoading(true);
+            console.log("Joining room:", room, "with email:", email);
             socket.emit("room:join", { email, room });
         } else {
             toast.error("User details not available", { autoClose: 1500 });
+            console.error("User details not available");
         }
-    }, [userDetails, socket]);
+    }, [userDetails, socket, url]);
 
     useEffect(() => {
-        if (userDetails && userDetails.email) {
-            handleSubmit();
-        }
-    }, [userDetails, handleSubmit]);
+        if (!userDetails || !userDetails.email) return;
 
-    useEffect(() => {
-        const initializeStream = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                    video: true
-                });
-                setMyStream(stream);
-                console.log("Initialized myStream with tracks:", stream.getTracks());
-                toast.success("Local stream initialized", { autoClose: 1500 });
-            } catch (error) {
-                console.error("Error accessing media devices:", error);
-                toast.error("Failed to access media devices", { autoClose: 1500 });
+        let isMounted = true;
+        initializeStream().then((stream) => {
+            if (isMounted && stream) {
+                handleSubmit();
             }
-        };
-
-        initializeStream();
+        });
 
         return () => {
+            isMounted = false;
             if (myStream) {
                 myStream.getTracks().forEach(track => track.stop());
+                console.log("Stopped myStream tracks");
             }
         };
-    }, []);
+    }, [userDetails, initializeStream, handleSubmit]);
 
     const handleUserJoined = useCallback((data) => {
         const { email, socketID } = data;
@@ -77,7 +85,10 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     }, []);
 
     const sendStreams = useCallback(() => {
-        if (!myStream || !myStream.getTracks() || tracksAddedRef.current) return;
+        if (!myStream || !myStream.getTracks() || tracksAddedRef.current) {
+            console.warn("sendStreams: No stream, no tracks, or tracks already added");
+            return;
+        }
         console.log("Adding tracks from myStream:", myStream.getTracks());
         for (const track of myStream.getTracks()) {
             peer.webRTCPeer.addTrack(track, myStream);
@@ -88,15 +99,17 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const initiateCall = useCallback(async () => {
         if (!myStream) {
             toast.error("Local stream not available", { autoClose: 1500 });
+            console.error("initiateCall: Local stream not available");
             return;
         }
         console.log("Initiating call to", remoteSocketId);
         try {
             const offer = await peer.getOffer();
             const name = userDetails.name;
-            sendStreams();
             socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
+            sendStreams();
             toast.info("Initiating call...", { autoClose: 1500 });
+            console.log("Offer sent:", offer);
         } catch (error) {
             console.error("Error initiating call:", error);
             toast.error("Failed to initiate call", { autoClose: 1500 });
@@ -105,27 +118,38 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
 
     const handleIncomingCall = useCallback(async ({ sendername, from, offer }) => {
         if (!myStream) {
-            toast.error("Local stream not available", { autoClose: 1500 });
+            console.warn("handleIncomingCall: Local stream not available, queuing call");
+            pendingCallRef.current = { sendername, from, offer };
             return;
         }
         setOtherUsername(sendername);
         setInComingCall(true);
         setRemoteSocketId(from);
-        console.log("Incoming call from", sendername, from);
+        console.log("Incoming call from", sendername, from, "Offer:", offer);
         toast.info(`Incoming call from ${sendername}`, { autoClose: 1500 });
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(offer));
             const ans = await peer.getAnswer(offer);
-            sendStreams();
             socket.emit("call:accepted", { to: from, ans });
+            sendStreams();
+            console.log("Answer sent:", ans);
         } catch (error) {
             console.error("Error accepting call:", error);
             toast.error("Failed to accept call", { autoClose: 1500 });
         }
     }, [socket, myStream, sendStreams]);
 
+    useEffect(() => {
+        if (myStream && pendingCallRef.current) {
+            console.log("Processing queued incoming call");
+            const { sendername, from, offer } = pendingCallRef.current;
+            handleIncomingCall({ sendername, from, offer });
+            pendingCallRef.current = null;
+        }
+    }, [myStream, handleIncomingCall]);
+
     const handleAcceptCall = useCallback(async ({ from, ans }) => {
-        console.log("Call accepted from", from);
+        console.log("Call accepted from", from, "Answer:", ans);
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(ans));
             toast.success("Call accepted", { autoClose: 1500 });
@@ -139,7 +163,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         try {
             const offer = await peer.getOffer();
             socket.emit("peer:nego:needed", { to: remoteSocketId, offer });
-            console.log("Negotiation needed, offer sent to", remoteSocketId);
+            console.log("Negotiation needed, offer sent to", remoteSocketId, offer);
         } catch (error) {
             console.error("Error in negotiation:", error);
             toast.error("Negotiation failed", { autoClose: 1500 });
@@ -150,7 +174,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         try {
             const ans = await peer.getAnswer(offer);
             socket.emit("peer:nego:done", { to: from, ans });
-            console.log("Negotiation answer sent to", from);
+            console.log("Negotiation answer sent to", from, ans);
         } catch (error) {
             console.error("Error in negotiation incoming:", error);
             toast.error("Negotiation failed", { autoClose: 1500 });
@@ -160,7 +184,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const handleNegoFinal = useCallback(async ({ ans }) => {
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(ans));
-            console.log("Negotiation finalized");
+            console.log("Negotiation finalized", ans);
         } catch (error) {
             console.error("Error in negotiation final:", error);
             toast.error("Negotiation failed", { autoClose: 1500 });
@@ -193,18 +217,30 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                 toast.success("WebRTC connection established", { autoClose: 1500 });
             } else if (peer.webRTCPeer.connectionState === "failed") {
                 toast.error("WebRTC connection failed", { autoClose: 1500 });
+                peer.resetConnection();
+                tracksAddedRef.current = false;
             }
+        });
+
+        peer.webRTCPeer.addEventListener("iceconnectionstatechange", () => {
+            console.log("ICE connection state:", peer.webRTCPeer.iceConnectionState);
         });
 
         return () => {
             peer.webRTCPeer.removeEventListener("track", () => {});
             peer.webRTCPeer.removeEventListener("connectionstatechange", () => {});
+            peer.webRTCPeer.removeEventListener("iceconnectionstatechange", () => {});
         };
     }, []);
 
     useEffect(() => {
-        peer?.setOnIceCandidate((candidate) => {
+        if (!peer) {
+            console.error("Peer service is not available");
+            return;
+        }
+        peer.setOnIceCandidate((candidate) => {
             if (remoteSocketId) {
+                console.log("Emitting ICE candidate to", remoteSocketId, candidate);
                 socket.emit("ice:candidate", { to: remoteSocketId, candidate });
             }
         });
@@ -215,10 +251,12 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         socket.on("peer:nego:needed", handleNegoNeededIncoming);
         socket.on("peer:nego:final", handleNegoFinal);
         socket.on("ice:candidate", async ({ candidate }) => {
+            console.log("Received ICE candidate:", candidate);
             await peer.addIceCandidate(candidate);
         });
         socket.on("user:left", ({ socketID }) => {
             if (socketID === remoteSocketId) {
+                console.log("User left:", socketID);
                 setRemoteSocketId("");
                 setRemoteStream(null);
                 setOtherUsername("");
@@ -241,6 +279,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
 
     useEffect(() => {
         if (remoteSocketId && myStream && remoteSocketId !== socket.id) {
+            console.log("Triggering initiateCall for remoteSocketId:", remoteSocketId);
             initiateCall();
         }
     }, [remoteSocketId, myStream, initiateCall, socket.id]);
