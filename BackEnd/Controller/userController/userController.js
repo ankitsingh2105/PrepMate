@@ -1,6 +1,7 @@
 const userModel = require("../../Model/userModel");
 const mockModel = require("../../Model/mockModel");
 const { ObjectId } = require('mongoose').Types; // or 'mongodb' if not using Mongoose
+const mongoose = require("mongoose");
 
 
 async function handleUserInfo(req, response) {
