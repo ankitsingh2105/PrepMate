@@ -18,107 +18,108 @@ async function handleUserInfo(req, response) {
 }
 
 
-const mongoose = require("mongoose");
-
-async function handleAvailability(req, response) {
+async function handleAvailability(req, res) {
     const { timeSlot, mockType, userId } = req.body;
     const { date, time } = timeSlot;
-    console.log("masaala is  :: ", timeSlot, mockType, userId)
     const checkSchedule = date + " " + time;
 
+    const session = await mongoose.startSession();
+
     try {
-        // 1: Check if the user already has a booking for the same schedule and mock type
+        session.startTransaction();
+
+        // 1: Check existing booking (with session)
         const existingBooking = await mockModel.findOne({
             user: userId,
-            mockType: mockType,
+            mockType,
             schedule: checkSchedule
-        });
+        }).session(session);
 
         if (existingBooking) {
-            console.log("Booking already exists for this user, mock type, and schedule.");
-            return response.send({
-                message: "You cannot book two entries for the same time",
-                code: 1
-            });
+            await session.abortTransaction();
+            session.endSession();
+            return res.send({ message: "You cannot book two entries for the same time", code: 1 });
         }
 
-        // Step 2: Attempt to lock a conflicting booking for another user (atomic operation)
+        // 2: Lock conflicting booking atomically (with session)
         const conflictingBooking = await mockModel.findOneAndUpdate(
             {
-                mockType: mockType,
+                mockType,
                 schedule: checkSchedule,
                 user: { $ne: userId },
                 tempLock: false
             },
-            { $set: { tempLock: true } },  // * Atomically lock this booking (in instance)
-            { new: true }  // * Return the updated document
+            { $set: { tempLock: true } },
+            { new: true, session }
         );
 
         if (conflictingBooking) {
-            console.log("currentUser :: ", userId);
-            console.log(conflictingBooking.user);
-            let idd = (conflictingBooking.user).valueOf();
-            let otherUserTicketID = (conflictingBooking._id).valueOf()
-            try {
-                const newMockModel = new mockModel({
-                    mockType,
-                    schedule: checkSchedule,
-                    tempLock: true,
-                    user: userId
-                });
+            const idd = conflictingBooking.user.valueOf();
+            const otherUserTicketID = conflictingBooking._id.valueOf();
 
-                let bookingId = (newMockModel._id).valueOf();
-                let sameUser = await userModel.findOneAndUpdate(
-                    { _id: userId },
-                    {
-                        $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId: bookingId, otherUserTicketID } }
-                    }
-                );
-                let otherUser = await userModel.findOneAndUpdate(
-                    { _id: idd },
-                    {
-                        $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId: otherUserTicketID, otherUserTicketID: bookingId } }
-                    }
-                );
+            const newMockModel = new mockModel({
+                mockType,
+                schedule: checkSchedule,
+                tempLock: true,
+                user: userId
+            });
 
-                await newMockModel.save();
-                console.log("found the other user :: ", otherUser);
-                console.log("found the other user :: ", sameUser);
-                console.log("Matching booking found for another user, locking it temporarily.");
-                return response.send({
-                    message: "Your booking is confirmed, please check your profile",
-                    code: 2
-                });
-            }
-            catch (error) {
-                console.log("found the other user error :: ", error);
-                response.send(error)
-            }
-        }
+            const bookingId = newMockModel._id.valueOf();
 
-        else {
-            // Step 3: No conflict, create a new booking
-            console.log("No conflicts, creating a new booking for the user.");
+            // Update both users with booking info (with session)
+            await userModel.findOneAndUpdate(
+                { _id: userId },
+                {
+                    $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId: bookingId, otherUserTicketID } }
+                },
+                { session }
+            );
+
+            await userModel.findOneAndUpdate(
+                { _id: idd },
+                {
+                    $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId: otherUserTicketID, otherUserTicketID: bookingId } }
+                },
+                { session }
+            );
+
+            await newMockModel.save({ session });
+
+            await session.commitTransaction();
+            session.endSession();
+
+            return res.send({
+                message: "Your booking is confirmed, please check your profile",
+                code: 2
+            });
+        } else {
+            // 3: No conflict - create new booking
             const newMockModel = new mockModel({
                 mockType,
                 schedule: checkSchedule,
                 tempLock: false,
                 user: userId
             });
-            await newMockModel.save();
-            response.send({
-                message : "No one to schedule we are adding you for booking",
-                code : 3,
+
+            await newMockModel.save({ session });
+
+            await session.commitTransaction();
+            session.endSession();
+
+            return res.send({
+                message: "No one to schedule, we are adding you for booking",
+                code: 3
             });
         }
-
     }
-
     catch (error) {
-        console.log("Error in handling availability:", error);
-        response.status(500).send("Server error");
+        await session.abortTransaction();
+        session.endSession();
+        console.error("Error in handling availability:", error);
+        return res.status(500).send("Server error");
     }
 }
+
 
 function handleUserLogout(req, response) {
     console.log("logging out");
@@ -150,55 +151,46 @@ async function handleUpdateUserInfo(req, response) {
 
 async function handleCancelBooking(req, res) {
     const { myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime } = req.body;
-    // todo :: go to both users and using ticket if remove the elemt of the booking array
-    // * removing ticket entry from my side
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-        let response = await userModel.findOneAndUpdate({ _id: myUserId },
-            {
-                $pull: {
-                    bookings: {
-                        otherUserTicketID
-                    }
-                }
-            },
-            { new: true }
-        )
+        // Remove booking entry from myUser
+        await userModel.findOneAndUpdate(
+            { _id: myUserId },
+            { $pull: { bookings: { otherUserTicketID } } },
+            { new: true, session }
+        );
+
+        // Remove booking entry from otherUser
+        await userModel.findOneAndUpdate(
+            { _id: otherUserId },
+            { $pull: { bookings: { myTicketId: otherUserTicketID } } },
+            { new: true, session }
+        );
+
+        // Remove mock booking from myUser side
+        await mockModel.findOneAndDelete({ _id: myTicketId }, { session });
+
+        // Remove mock booking from otherUser side
+        await mockModel.findOneAndDelete({ _id: otherUserTicketID }, { session });
+
+        // Commit transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        res.send("Booking cancelled successfully");
+    } catch (error) {
+        // Abort transaction if error occurs
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error("Error cancelling booking:", error);
+        res.status(500).send("Failed to cancel booking");
     }
-    catch (error) {
-        console.log("first error ::  ", error);
-    }
-    // * removing ticket entry other my side
-    try {
-        let response = await userModel.findOneAndUpdate({ _id: otherUserId },
-            {
-                $pull: {
-                    bookings: {
-                        myTicketId: otherUserTicketID
-                    }
-                }
-            },
-            { new: true }
-        )
-    }
-    catch (error) {
-        console.log("second error ::  ", error);
-    }
-    // *remove the mock model from my side
-    try {
-        await mockModel.findOneAndDelete({ _id: myTicketId })
-    }
-    catch (error) {
-        console.log("third :: ", error);
-    }
-    // *remove the mock model from the other side
-    try {
-        await mockModel.findOneAndDelete({ _id: otherUserTicketID })
-    }
-    catch (error) {
-        console.log("fourth :: ", error);
-    }
-    res.send("Booking cancelled");
 }
+
 
 module.exports = {
     handleUserInfo,
