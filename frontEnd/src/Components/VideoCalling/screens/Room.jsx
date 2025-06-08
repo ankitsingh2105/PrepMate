@@ -2,13 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, Fragment } from "react
 import { useSocket } from "../context/SocketProvider";
 import { useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
-import {
-  Loader,
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
-} from "lucide-react";
+import { Loader, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import peer from "../service/peer";
@@ -23,19 +17,24 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
   const [myStream, setMyStream] = useState(null);
   const [loading, setLoading] = useState(false);
   const [remoteStream, setRemoteStream] = useState(null);
-  const [inComingCall, setInComingCall] = useState(false);
+  const [incomingCall, setIncomingCall] = useState(false);
   const [otherUsername, setOtherUsername] = useState("");
-  const [mySocketID, setMySocketId] = useState("");
-  const [otherUserID, setOtherUserID] = useState("");
+  const [mySocketId, setMySocketId] = useState("");
+  const [otherUserId, setOtherUserId] = useState("");
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const tracksAddedRef = useRef(false);
 
-  // Redux user info
-  const userInfo = useSelector((state) => state.userInfo);
-  const { userDetails } = userInfo;
+  // Redux user info with fallback
+  const userInfo = useSelector((state) => state.userInfo || {});
+  const userDetails = userInfo.userDetails || {};
+
+  // Show toast to copy URL
+  useEffect(() => {
+    toast.info("Copy the URL and send to a friend", { autoClose: 1500 });
+  }, []);
 
   // Initialize local stream
   useEffect(() => {
@@ -69,22 +68,22 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
   // Join room
   useEffect(() => {
     const room = location.pathname.split("/")[2];
-    if (userDetails && userDetails.email) {
-      const email = userDetails.email;
+    if (userDetails.email) {
       setLoading(true);
-      socket.emit("room:join", { email, room });
+      socket.emit("room:join", { email: userDetails.email, room });
       toast.success("Joining room...", { autoClose: 1500 });
     } else {
-        console.log("User details not found. Please log in.");
+      toast.error("User details not found. Please log in.", { autoClose: 1500 });
+      setLoading(false);
     }
-  }, [userDetails, socket, location]);
+  }, [userDetails.email, socket, location]);
 
   // Auto-connect WebRTC on user join
   const handleUserJoined = useCallback(
     (data) => {
       const { email, room, socketID } = data;
       setRemoteSocketId(socketID);
-      setOtherUserID(socketID);
+      setOtherUserId(socketID);
       setMySocketId(socket.id);
       setOtherUsername(userDetails.name || "Participant");
 
@@ -113,9 +112,9 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
         return;
       }
       setOtherUsername(sendername);
-      setInComingCall(true);
+      setIncomingCall(true);
       setRemoteSocketId(from);
-      setOtherUserID(from);
+      setOtherUserId(from);
       const ans = await peer.getAnswer(offer);
       socket.emit("call:accepted", { to: from, ans });
       sendStreams();
@@ -131,7 +130,7 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
     tracksAddedRef.current = true;
   }, [myStream]);
 
-  const handleAcceptCall = useCallback(
+  const handleCallAccepted = useCallback(
     ({ from, ans }) => {
       peer.setRemoteDescription(ans);
       sendStreams();
@@ -141,7 +140,7 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
 
   const handleNegoNeeded = useCallback(async () => {
     const offer = await peer.getOffer();
-    socket.emit("peer:nego:needed", { to: remoteSocketId, offer });
+    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
   }, [socket, remoteSocketId]);
 
   const handleNegoNeededIncoming = useCallback(
@@ -183,14 +182,14 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
     socket.on("incoming:call", handleIncomingCall);
-    socket.on("call:accepted", handleAcceptCall);
+    socket.on("call:accepted", handleCallAccepted);
     socket.on("peer:nego:needed", handleNegoNeededIncoming);
     socket.on("peer:nego:final", handleNegoFinal);
-    socket.on("user-left", () => {
+    socket.on("user:left", () => {
       toast.success("User Left.", { autoClose: 1500 });
       setRemoteStream(null);
       setRemoteSocketId("");
-      setOtherUserID("");
+      setOtherUserId("");
       peer.webRTCPeer.close();
       tracksAddedRef.current = false;
       if (remoteVideoRef.current) {
@@ -204,13 +203,13 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
       socket.off("call:accepted");
       socket.off("peer:nego:needed");
       socket.off("peer:nego:final");
-      socket.off("user-left");
+      socket.off("user:left");
     };
   }, [
     socket,
     handleUserJoined,
     handleIncomingCall,
-    handleAcceptCall,
+    handleCallAccepted,
     handleNegoNeededIncoming,
     handleNegoFinal,
   ]);
@@ -284,72 +283,81 @@ const Room = ({ windowWidth = 1200, roomHeight, direction }) => {
 
       {/* Video Grid */}
       <div className="container mx-auto px-4 py-6 md:py-8">
-        <div className={`grid gap-4 md:gap-6 ${direction === "column" ? "flex flex-col" : "lg:grid-cols-2"} xl:gap-8`}>
-          {/* Local Video */}
-          <div
-            className="relative flex items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gray-100 object-contain shadow-xl md:shadow-2xl"
-            style={{ width: windowWidth / 2 - 50, height: roomHeight - 110 }}
-          >
-            {myStream ? (
-              <Fragment>
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="h-full w-full rotate-y-180 object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-red-500 text-white py-1 px-3 text-sm font-semibold">
-                  You
+        {loading ? (
+          <div className={`grid gap-4 md:gap-6 ${direction === "column" ? "flex flex-col" : "lg:grid-cols-2"} xl:gap-8`}>
+            {/* Local Video */}
+            <div
+              className="relative flex items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gray-100 object-contain shadow-xl md:shadow-2xl"
+              style={{ width: windowWidth / 2 - 50, height: roomHeight - 110 }}
+            >
+              {myStream ? (
+                <Fragment>
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="h-full w-full rotate-y-180 object-cover"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-red-500 text-white py-1 px-3 text-sm font-semibold">
+                    You
+                  </div>
+                  <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3">
+                    <button
+                      onClick={toggleAudio}
+                      className={`rounded-full p-2 ${audioEnabled ? "bg-green-500" : "bg-red-500"} cursor-pointer text-white`}
+                    >
+                      {audioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                    </button>
+                    <button
+                      onClick={toggleVideo}
+                      className={`rounded-full p-2 ${videoEnabled ? "bg-green-500" : "bg-red-500"} cursor-pointer text-white`}
+                    >
+                      {videoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
+                    </button>
+                  </div>
+                </Fragment>
+              ) : (
+                <div className="flex flex-col items-center gap-4 p-5">
+                  <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
+                  <p className="text-center text-lg md:text-2xl">Loading your video...</p>
                 </div>
-                <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3">
-                  <button
-                    onClick={toggleAudio}
-                    className={`rounded-full p-2 ${audioEnabled ? "bg-green-500" : "bg-red-500"} cursor-pointer text-white`}
-                  >
-                    {audioEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-                  </button>
-                  <button
-                    onClick={toggleVideo}
-                    className={`rounded-full p-2 ${videoEnabled ? "bg-green-500" : "bg-red-500"} cursor-pointer text-white`}
-                  >
-                    {videoEnabled ? <Video size={20} /> : <VideoOff size={20} />}
-                  </button>
-                </div>
-              </Fragment>
-            ) : (
-              <div className="flex flex-col items-center gap-4 p-5">
-                <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
-                <p className="text-center text-lg md:text-2xl">Loading your video...</p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Remote Video */}
-          <div
-            className="flex items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gray-100 object-contain shadow-xl md:shadow-2xl"
-            style={{ width: windowWidth / 2 - 50, height: roomHeight - 110 }}
-          >
-            {remoteSocketId && remoteStream ? (
-              <Fragment>
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="h-full w-full object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-purple-500 text-white py-1 px-3 text-sm font-semibold">
-                  {otherUsername || "Participant"}
+            {/* Remote Video */}
+            <div
+              className="flex items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gray-100 object-contain shadow-xl md:shadow-2xl"
+              style={{ width: windowWidth / 2 - 50, height: roomHeight - 110 }}
+            >
+              {remoteSocketId && remoteStream ? (
+                <Fragment>
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-purple-500 text-white py-1 px-3 text-sm font-semibold">
+                    {otherUsername || "Participant"}
+                  </div>
+                </Fragment>
+              ) : (
+                <div className="flex flex-col items-center gap-4 p-5">
+                  <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
+                  <p className="text-center text-lg md:text-2xl">Waiting for another user...</p>
                 </div>
-              </Fragment>
-            ) : (
-              <div className="flex flex-col items-center gap-4 p-5">
-                <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
-                <p className="text-center text-lg md:text-2xl">Waiting for another user...</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center justify-center h-screen">
+            <div className="flex flex-col items-center">
+              <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
+              <p className="mt-4 text-gray-600 font-medium">Loading video call...</p>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
