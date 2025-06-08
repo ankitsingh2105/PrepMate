@@ -33,6 +33,8 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
       const email = userDetails.email;
       setLoading(true);
       socket.emit("room:join", { email, room });
+    } else {
+      toast.error("User details not available", { autoClose: 1500 });
     }
   }, [userDetails, socket]);
 
@@ -51,6 +53,7 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
         });
         setMyStream(stream);
         console.log("Initialized myStream with tracks:", stream.getTracks());
+        toast.success("Local stream initialized", { autoClose: 1500 });
       } catch (error) {
         console.error("Error accessing media devices:", error);
         toast.error("Failed to access media devices", { autoClose: 1500 });
@@ -68,8 +71,9 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
 
   const handleUserJoined = useCallback((data) => {
     const { email, socketID } = data;
-    console.log("New user joined with remote id:", data);
+    console.log("New user joined:", data);
     setRemoteSocketId(socketID);
+    toast.info(`User ${email} joined the room`, { autoClose: 1500 });
   }, []);
 
   const initiateCall = useCallback(async () => {
@@ -77,11 +81,17 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
       toast.error("Local stream not available", { autoClose: 1500 });
       return;
     }
-    console.log("Initiating call...");
-    const offer = await peer.getOffer();
-    const name = userDetails.name;
-    socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
-    sendStreams();
+    console.log("Initiating call to", remoteSocketId);
+    try {
+      const offer = await peer.getOffer();
+      const name = userDetails.name;
+      socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
+      sendStreams();
+      toast.info("Initiating call...", { autoClose: 1500 });
+    } catch (error) {
+      console.error("Error initiating call:", error);
+      toast.error("Failed to initiate call", { autoClose: 1500 });
+    }
   }, [remoteSocketId, socket, userDetails, myStream]);
 
   const handleIncomingCall = useCallback(async ({ sendername, from, offer }) => {
@@ -90,12 +100,18 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
       return;
     }
     setOtherUsername(sendername);
-    console.log("Incoming call from", sendername, from);
     setInComingCall(true);
     setRemoteSocketId(from);
-    const ans = await peer.getAnswer(offer);
-    socket.emit("call:accepted", { to: from, ans });
-    sendStreams();
+    console.log("Incoming call from", sendername, from);
+    toast.info(`Incoming call from ${sendername}`, { autoClose: 1500 });
+    try {
+      const ans = await peer.getAnswer(offer);
+      socket.emit("call:accepted", { to: from, ans });
+      sendStreams();
+    } catch (error) {
+      console.error("Error accepting call:", error);
+      toast.error("Failed to accept call", { autoClose: 1500 });
+    }
   }, [socket, myStream]);
 
   const sendStreams = useCallback(() => {
@@ -108,23 +124,47 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
   }, [myStream]);
 
   const handleAcceptCall = useCallback(({ from, ans }) => {
-    peer.setRemoteDescription(ans);
     console.log("Call accepted from", from);
-    sendStreams();
+    try {
+      peer.setRemoteDescription(ans);
+      sendStreams();
+      toast.success("Call accepted", { autoClose: 1500 });
+    } catch (error) {
+      console.error("Error setting remote description:", error);
+      toast.error("Failed to accept call", { autoClose: 1500 });
+    }
   }, [sendStreams]);
 
   const handleNegoNeeded = useCallback(async () => {
-    const offer = await peer.getOffer();
-    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
+    try {
+      const offer = await peer.getOffer();
+      socket.emit("peer:nego:needed", { to: remoteSocketId, offer });
+      console.log("Negotiation needed, offer sent to", remoteSocketId);
+    } catch (error) {
+      console.error("Error in negotiation:", error);
+      toast.error("Negotiation failed", { autoClose: 1500 });
+    }
   }, [socket, remoteSocketId]);
 
   const handleNegoNeededIncoming = useCallback(async ({ from, offer }) => {
-    const ans = await peer.getAnswer(offer);
-    socket.emit("peer:nego:done", { to: from, ans });
+    try {
+      const ans = await peer.getAnswer(offer);
+      socket.emit("peer:nego:done", { to: from, ans });
+      console.log("Negotiation answer sent to", from);
+    } catch (error) {
+      console.error("Error in negotiation incoming:", error);
+      toast.error("Negotiation failed", { autoClose: 1500 });
+    }
   }, [socket]);
 
   const handleNegoFinal = useCallback(async ({ ans }) => {
-    await peer.setRemoteDescription(ans);
+    try {
+      await peer.setRemoteDescription(ans);
+      console.log("Negotiation finalized");
+    } catch (error) {
+      console.error("Error in negotiation final:", error);
+      toast.error("Negotiation failed", { autoClose: 1500 });
+    }
   }, []);
 
   useEffect(() => {
@@ -137,9 +177,13 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
   useEffect(() => {
     peer.webRTCPeer.addEventListener("track", async (e) => {
       const remoteStreams = e.streams;
-      console.log("Received remote streams:", remoteStreams);
-      if (remoteStreams) {
+      console.log("Received remote streams:", remoteStreams, "Tracks:", e.streams[0]?.getTracks());
+      if (remoteStreams && remoteStreams[0]) {
         setRemoteStream(remoteStreams[0]);
+        toast.success("Remote stream received", { autoClose: 1500 });
+      } else {
+        console.warn("No remote stream received");
+        toast.warn("No remote stream available", { autoClose: 1500 });
       }
     });
   }, []);
@@ -234,7 +278,7 @@ export default function Room({ windowWidth, roomWidth, roomHeight, direction }) 
 
             {/* Remote video stream */}
             <div className="relative">
-              {inComingCall && remoteStream ? (
+              {remoteStream ? (
                 <div className="rounded-xl overflow-hidden shadow-lg border-2 border-purple-200">
                   <ReactPlayer
                     width={roomWidth}

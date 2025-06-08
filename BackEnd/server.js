@@ -11,7 +11,7 @@ const signupRouter = require("./Router/signup");
 const userRouter = require("./Router/userRoutes");
 const connect = require("./connect");
 
-const server = http.createServer(app); // Combine Express + Socket.IO
+const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: ["http://localhost:5173", "https://prep-mate-one.vercel.app"],
@@ -48,23 +48,29 @@ interviewNamespace.on("connection", (socket) => {
   socket.on("room:join", ({ email, room }) => {
     const data = { email, room, socketID: socket.id };
     socket.join(room);
-    interviewNamespace.to(room).emit("user:joined", data);
+    // Emit to other clients in the room, excluding the joining socket
+    socket.to(room).emit("user:joined", data);
+    // Emit room:join to the joining socket
     interviewNamespace.to(socket.id).emit("room:join", data);
   });
 
   socket.on("user:call", ({ sendername, to, offer }) => {
+    console.log(`user:call from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("incoming:call", { sendername, from: socket.id, offer });
   });
 
   socket.on("call:accepted", ({ to, ans }) => {
+    console.log(`call:accepted from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("call:accepted", { from: socket.id, ans });
   });
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
+    console.log(`peer:nego:needed from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("peer:nego:needed", { from: socket.id, offer });
   });
 
   socket.on("peer:nego:done", ({ to, ans }) => {
+    console.log(`peer:nego:done from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("peer:nego:final", { from: socket.id, ans });
   });
 });
