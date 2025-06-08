@@ -1,83 +1,59 @@
-import { useState, useCallback, useEffect, useRef, Fragment } from "react";
-import { useSocket } from "../context/SocketProvider";
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useSocket } from '../context/SocketProvider';
+import ReactPlayer from "react-player";
+import peer from '../service/peer';
+import { useLocation } from 'react-router-dom';
 import { useSelector } from "react-redux";
-import { useLocation } from "react-router-dom";
-import { Loader } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import peer from "../service/peer";
+import 'react-toastify/dist/ReactToastify.css';
 
-const Room = ({ windowWidth = 1200, roomHeight = 500, direction }) => {
+export default function Room({ windowWidth, roomWidth, roomHeight, direction }) {
   const socket = useSocket();
-  const location = useLocation();
-  const currentPageUrl = `https://prep-mate-one.vercel.app${location.pathname}`;
-
-  // States
   const [remoteSocketId, setRemoteSocketId] = useState("");
   const [myStream, setMyStream] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [inComingCall, setInComingCall] = useState(false);
   const [otherUsername, setOtherUsername] = useState("");
-  const [streamError, setStreamError] = useState(null);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
   const tracksAddedRef = useRef(false);
 
-  // Redux user info with fallback
-  const userInfo = useSelector((state) => state.userInfo || {});
-  const userDetails = userInfo.userDetails || {};
-
-  // Initialize stream and join room on mount
+  const location = useLocation();
+  const currentPageUrl = `https://prep-mate-one.vercel.app${location.pathname}`;
   useEffect(() => {
-    if (!userDetails.email) {
-      console.error("No user email found in userDetails:", userDetails);
-      toast.error("Please log in to join the call.", { autoClose: 1500 });
-      return;
+    toast("Copy the url and send to a friend", { autoClose: 1500 });
+  }, []);
+
+  const userInfo = useSelector((state) => state.userInfo);
+  const { userDetails } = userInfo;
+  const url = useLocation();
+
+  const handleSubmit = useCallback(() => {
+    const room = url.pathname.split("/")[2];
+    if (userDetails && userDetails.email) {
+      const email = userDetails.email;
+      setLoading(true);
+      socket.emit("room:join", { email, room });
     }
+  }, [userDetails, socket]);
 
-    const room = location.pathname.split("/")[2];
+  useEffect(() => {
+    if (userDetails && userDetails.email) {
+      handleSubmit();
+    }
+  }, [userDetails, handleSubmit]);
 
+  useEffect(() => {
     const initializeStream = async () => {
-      if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
-        console.error("WebRTC requires HTTPS. Current protocol:", window.location.protocol);
-        toast.error("Video calls require HTTPS.", { autoClose: 3000 });
-        setStreamError("HTTPS required");
-        return;
-      }
-
       try {
-        console.log("WebRTC: Requesting media devices...");
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
-          video: true,
+          video: true
         });
-        console.log("WebRTC: Stream acquired:", stream.getTracks());
         setMyStream(stream);
-        setStreamError(null);
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        } else {
-          console.warn("WebRTC: localVideoRef not set yet");
-        }
-
-        // Join room after stream is ready
-        socket.emit("room:join", { email: userDetails.email, room });
-        toast.info("Copy the URL and send to a friend", { autoClose: 1500 });
+        console.log("Initialized myStream with tracks:", stream.getTracks());
       } catch (error) {
-        console.error("WebRTC: Error accessing media devices:", error);
-        setStreamError(error.name || "Unknown error");
-        switch (error.name) {
-          case "NotAllowedError":
-            toast.error("Camera/Mic Permission Denied. Please allow access.", { autoClose: 3000 });
-            break;
-          case "NotFoundError":
-            toast.error("No Camera/Mic Found. Please connect a device.", { autoClose: 3000 });
-            break;
-          case "NotReadableError":
-            toast.error("Camera/Mic in use by another application.", { autoClose: 3000 });
-            break;
-          default:
-            toast.error(`Failed to access media: ${error.message}`, { autoClose: 3000 });
-        }
+        console.error("Error accessing media devices:", error);
+        toast.error("Failed to access media devices", { autoClose: 1500 });
       }
     };
 
@@ -85,91 +61,69 @@ const Room = ({ windowWidth = 1200, roomHeight = 500, direction }) => {
 
     return () => {
       if (myStream) {
-        console.log("WebRTC: Cleaning up stream tracks");
-        myStream.getTracks().forEach((track) => track.stop());
+        myStream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [userDetails.email, socket, location]);
+  }, []);
 
-  // Handle user joined
-  const handleUserJoined = useCallback(
-    (data) => {
-      console.log("WebRTC: User joined:", data);
-      const { email, socketID } = data;
-      setRemoteSocketId(socketID);
-      setOtherUsername(userDetails.name || "Participant");
+  const handleUserJoined = useCallback((data) => {
+    const { email, socketID } = data;
+    console.log("New user joined with remote id:", data);
+    setRemoteSocketId(socketID);
+  }, []);
 
-      // Automatically initiate WebRTC connection if this client has a lower socket ID
-      if (myStream && socket.id < socketID) {
-        const initiateCall = async () => {
-          console.log("WebRTC: Initiating call to", socketID);
-          const offer = await peer.getOffer();
-          socket.emit("user:call", {
-            sendername: userDetails.name,
-            to: socketID,
-            offer,
-          });
-          sendStreams();
-        };
-        initiateCall();
-      }
-    },
-    [myStream, socket, userDetails]
-  );
+  const initiateCall = useCallback(async () => {
+    if (!myStream) {
+      toast.error("Local stream not available", { autoClose: 1500 });
+      return;
+    }
+    console.log("Initiating call...");
+    const offer = await peer.getOffer();
+    const name = userDetails.name;
+    socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
+    sendStreams();
+  }, [remoteSocketId, socket, userDetails, myStream]);
 
-  // WebRTC event handlers
-  const handleIncomingCall = useCallback(
-    async ({ sendername, from, offer }) => {
-      if (!myStream) {
-        console.warn("WebRTC: No local stream for incoming call");
-        toast.error("Local stream not available", { autoClose: 1500 });
-        return;
-      }
-      console.log("WebRTC: Incoming call from", sendername, from);
-      setOtherUsername(sendername);
-      setRemoteSocketId(from);
-      const ans = await peer.getAnswer(offer);
-      socket.emit("call:accepted", { to: from, ans });
-      sendStreams();
-    },
-    [socket, myStream]
-  );
+  const handleIncomingCall = useCallback(async ({ sendername, from, offer }) => {
+    if (!myStream) {
+      toast.error("Local stream not available", { autoClose: 1500 });
+      return;
+    }
+    setOtherUsername(sendername);
+    console.log("Incoming call from", sendername, from);
+    setInComingCall(true);
+    setRemoteSocketId(from);
+    const ans = await peer.getAnswer(offer);
+    socket.emit("call:accepted", { to: from, ans });
+    sendStreams();
+  }, [socket, myStream]);
 
   const sendStreams = useCallback(() => {
     if (!myStream || !myStream.getTracks() || tracksAddedRef.current) return;
-    console.log("WebRTC: Sending streams:", myStream.getTracks());
+    console.log("Adding tracks from myStream:", myStream.getTracks());
     for (const track of myStream.getTracks()) {
       peer.webRTCPeer.addTrack(track, myStream);
     }
     tracksAddedRef.current = true;
   }, [myStream]);
 
-  const handleCallAccepted = useCallback(
-    ({ from, ans }) => {
-      console.log("WebRTC: Call accepted from", from);
-      peer.setRemoteDescription(ans);
-      sendStreams();
-    },
-    [sendStreams]
-  );
+  const handleAcceptCall = useCallback(({ from, ans }) => {
+    peer.setRemoteDescription(ans);
+    console.log("Call accepted from", from);
+    sendStreams();
+  }, [sendStreams]);
 
   const handleNegoNeeded = useCallback(async () => {
-    console.log("WebRTC: Negotiation needed");
     const offer = await peer.getOffer();
     socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
   }, [socket, remoteSocketId]);
 
-  const handleNegoNeededIncoming = useCallback(
-    async ({ from, offer }) => {
-      console.log("WebRTC: Incoming negotiation from", from);
-      const ans = await peer.getAnswer(offer);
-      socket.emit("peer:nego:done", { to: from, ans });
-    },
-    [socket]
-  );
+  const handleNegoNeededIncoming = useCallback(async ({ from, offer }) => {
+    const ans = await peer.getAnswer(offer);
+    socket.emit("peer:nego:done", { to: from, ans });
+  }, [socket]);
 
   const handleNegoFinal = useCallback(async ({ ans }) => {
-    console.log("WebRTC: Finalizing negotiation");
     await peer.setRemoteDescription(ans);
   }, []);
 
@@ -181,162 +135,144 @@ const Room = ({ windowWidth = 1200, roomHeight = 500, direction }) => {
   }, [handleNegoNeeded]);
 
   useEffect(() => {
-    const handleTrack = (e) => {
+    peer.webRTCPeer.addEventListener("track", async (e) => {
       const remoteStreams = e.streams;
-      console.log("WebRTC: Received remote streams:", remoteStreams);
-      if (remoteStreams && remoteStreams[0]) {
+      console.log("Received remote streams:", remoteStreams);
+      if (remoteStreams) {
         setRemoteStream(remoteStreams[0]);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStreams[0];
-        }
       }
-    };
-    peer.webRTCPeer.addEventListener("track", handleTrack);
-    return () => {
-      peer.webRTCPeer.removeEventListener("track", handleTrack);
-    };
+    });
   }, []);
 
-  // Socket event listeners
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
     socket.on("incoming:call", handleIncomingCall);
-    socket.on("call:accepted", handleCallAccepted);
+    socket.on("call:accepted", handleAcceptCall);
     socket.on("peer:nego:needed", handleNegoNeededIncoming);
     socket.on("peer:nego:final", handleNegoFinal);
-    socket.on("user:left", () => {
-      console.log("WebRTC: User left");
-      toast.success("User Left.", { autoClose: 1500 });
-      setRemoteStream(null);
-      setRemoteSocketId("");
-      setOtherUsername("");
-      peer.webRTCPeer.close();
-      tracksAddedRef.current = false;
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-    });
 
     return () => {
-      socket.off("user:joined");
-      socket.off("incoming:call");
-      socket.off("call:accepted");
-      socket.off("peer:nego:needed");
-      socket.off("peer:nego:final");
-      socket.off("user:left");
+      socket.off("user:joined", handleUserJoined);
+      socket.off("incoming:call", handleIncomingCall);
+      socket.off("call:accepted", handleAcceptCall);
+      socket.off("peer:nego:needed", handleNegoNeededIncoming);
+      socket.off("peer:nego:final", handleNegoFinal);
     };
-  }, [
-    socket,
-    handleUserJoined,
-    handleIncomingCall,
-    handleCallAccepted,
-    handleNegoNeededIncoming,
-    handleNegoFinal,
-  ]);
+  }, [socket, handleUserJoined, handleIncomingCall, handleAcceptCall, handleNegoNeededIncoming, handleNegoFinal]);
 
-  // Copy link
+  useEffect(() => {
+    if (remoteSocketId && myStream && remoteSocketId !== socket.id) {
+      initiateCall();
+    }
+  }, [remoteSocketId, myStream, initiateCall, socket.id]);
+
   const handleCopy = (textToCopy) => {
-    navigator.clipboard
-      .writeText(textToCopy)
+    navigator.clipboard.writeText(textToCopy)
       .then(() => {
-        toast.success("Invite link copied to clipboard!", { autoClose: 1500 });
+        toast.success('Invite link copied to clipboard!', { autoClose: 1500 });
       })
       .catch((error) => {
-        console.error("Failed to copy text:", error);
-        toast.error("Failed to copy text.", { autoClose: 1500 });
+        console.error('Failed to copy text:', error);
+        toast.error('Failed to copy text.', { autoClose: 1500 });
       });
   };
 
   return (
-    <section
-      className="-z-20 min-h-dvh bg-gray-50"
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' width='20' height='20' fill='none' stroke-width='2' stroke='%23E0E0E0'%3e%3cpath d='M0 .5H19.5V20'/%3e%3c/svg%3e")`,
-      }}
-    >
+    <div className="w-full text-center">
       <ToastContainer />
-      {/* Share link */}
-      <div className="fixed top-2 right-2 z-10 inline-flex w-fit items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5">
-        <span className="text-xs font-medium text-gray-700">Share this link:</span>
-        <div className="flex items-center bg-white px-2 py-1 rounded border border-purple-200">
-          <span className="text-xs text-gray-600 truncate max-w-[150px]">
-            {currentPageUrl}
-          </span>
-          <button
-            onClick={() => handleCopy(currentPageUrl)}
-            className="ml-2 text-purple-600 hover:text-purple-800 transition-colors"
-            aria-label="Copy link"
-          >
-            <i className="fa-regular fa-copy"></i>
-          </button>
-        </div>
-      </div>
+      {loading ? (
+        <div className="flex flex-col items-center">
+          {/* Share link section */}
+          <div className="bg-purple-50 text-gray-700 py-2 px-4 rounded-lg shadow-sm mb-4 flex items-center justify-center space-x-2 w-auto max-w-md mx-auto">
+            <span className="text-sm font-medium">Share this link:</span>
+            <div className="flex items-center bg-white px-3 py-1 rounded border border-purple-200">
+              <span className="text-xs text-gray-600 truncate max-w-[200px]">
+                http://prep-mate-one.vercel.app{location.pathname}
+              </span>
+              <button
+                onClick={() => handleCopy(currentPageUrl)}
+                className="ml-2 text-purple-600 hover:text-purple-800 transition-colors"
+                aria-label="Copy link"
+              >
+                <i className="fa-regular fa-copy"></i>
+              </button>
+            </div>
+          </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 md:py-0">
-        <div
-          className={`grid gap-4 md:gap-6 ${
-            direction === "column" ? "flex flex-col" : "lg:grid-cols-2"
-          } xl:gap-8`}
-        >
-          {/* Local Video */}
-          <div
-            className="relative flex items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gray-100 object-contain shadow-xl md:shadow-2xl"
-            style={{ width: windowWidth / 2 - 4, height: roomHeight - 2 }}
-          >
-            {myStream ? (
-              <>
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="h-full w-full rotate-y-180 object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-blue-600 text-white py-1 px-3 text-sm font-semibold">
-                  You
-                </div>
-              </>
+          {/* Connection status */}
+          <div className="mb-4">
+            {otherUsername && remoteSocketId ? (
+              <div className="bg-green-500 text-white px-4 py-1 rounded-full inline-flex items-center">
+                <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+                <span className="font-medium">Connected</span>
+              </div>
             ) : (
-              <div className="flex flex-col items-center gap-4 p-5">
-                <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
-                <p className="text-center text-lg md:text-2xl">
-                  {streamError ? `Stream unavailable: ${streamError}` : "Loading your video..."}
-                </p>
+              <div className="bg-red-500 text-white px-4 py-1 rounded-full inline-flex items-center">
+                <div className="w-2 h-2 bg-white rounded-full mr-2"></div>
+                <span className="font-medium">Disconnected</span>
               </div>
             )}
           </div>
 
-          {/* Remote Video */}
-          <div
-            className="flex items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-300 bg-gray-100 object-contain shadow-xl md:shadow-2xl"
-            style={{ width: windowWidth / 2 - 4, height: roomHeight - 2 }}
-          >
-            {remoteSocketId && remoteStream ? (
-              <>
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="h-full w-full object-cover"
+          {/* Video streams */}
+          <main className={`flex items-center justify-center ${direction === 'column' ? 'flex-col' : 'flex-row'} gap-4`}>
+            {/* My video stream */}
+            {myStream && (
+              <div className="relative rounded-xl overflow-hidden shadow-lg border-2">
+                <ReactPlayer
+                  width={roomWidth}
+                  height={roomHeight}
+                  url={myStream}
+                  playing
+                  muted
                 />
-                <div className="absolute bottom-0 left-0 right-0 bg-purple-500 text-white py-1 px-3 text-sm font-semibold">
-                  {otherUsername || "Participant"}
+                <div className="absolute bottom-0 left-0 right-0 bg-red text-red py-1 px-3 text-sm font-semibold">
+                  You
                 </div>
-              </>
-            )
-            : (
-              <div className="flex flex-col items-center gap-4 p-5">
-                <Loader className="size-12 animate-spin [animation-duration:2s] md:size-20" />
-                <p className="text-center text-lg md:text-2xl">Waiting for another user...</p>
               </div>
-            )
-          }
+            )}
+
+            {/* Remote video stream */}
+            <div className="relative">
+              {inComingCall && remoteStream ? (
+                <div className="rounded-xl overflow-hidden shadow-lg border-2 border-purple-200">
+                  <ReactPlayer
+                    width={roomWidth}
+                    height={roomHeight}
+                    url={remoteStream}
+                    playing
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 text-black py-1 px-3 text-sm font-semibold">
+                    {otherUsername || 'Participant'}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 p-6"
+                  style={{
+                    width: roomWidth - 50,
+                    height: roomHeight - 110,
+                  }}
+                >
+                  <div className="text-center">
+                    <div className="text-gray-500 mb-2">
+                      <i className="fa-solid fa-user-plus text-4xl"></i>
+                    </div>
+                    <p className="text-gray-600 font-medium">Waiting for someone to join...</p>
+                    <p className="text-gray-500 text-sm mt-2">Share the link to invite a participant</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="flex items-center justify-center h-screen">
+          <div className="flex flex-col items-center">
+            <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="mt-4 text-gray-600 font-medium">Loading video call...</p>
           </div>
         </div>
-      </div>
-    </section>
+      )}
+    </div>
   );
-};
-
-export default Room;
+}
