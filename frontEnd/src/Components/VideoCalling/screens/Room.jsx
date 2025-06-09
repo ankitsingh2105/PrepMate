@@ -87,7 +87,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                 console.log("Stopped myStream tracks in room", currentRoom);
             }
         };
-    }, [userDetails, initializeStream, handleSubmit, currentRoom, myStream]);
+    }, [userDetails, initializeStream, handleSubmit, currentRoom]);
 
     const handleToggleAudio = useCallback(() => {
         if (!myStream) {
