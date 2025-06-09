@@ -10,7 +10,7 @@ export default function DSAScreen() {
                     <CodeEditor />
                 </aside>
                 <aside>
-                    <Room windowWidth="350px" direction="column" roomWidth="200px" roomHeight="200px" />
+                    <Room windowWidth="350px" direction="column" roomWidth="250px" roomHeight="250px" />
                 </aside>
             </main>
         </>

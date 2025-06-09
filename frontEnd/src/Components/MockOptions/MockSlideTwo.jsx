@@ -103,7 +103,7 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>
               {mock.m1 === 'DSA' ? 
-                'Practice coding problems and algorithms with real-time feedback' : 
+                'Practice coding problems and algorithms ' : 
                 'Improve your communication skills and prepare for behavioral questions'}
             </p>
           </div>

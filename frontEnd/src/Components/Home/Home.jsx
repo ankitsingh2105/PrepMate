@@ -41,7 +41,7 @@ export default function Home() {
                                 <div>
                                     <p className="text-gray-700 font-medium">Your Credits</p>
                                     <div className="flex items-center mt-1">
-                                        <span className="text-purple-600 font-bold text-xl">5</span>
+                                        <span className="text-purple-600 font-bold text-xl">unlimited</span>
                                         <span className="text-gray-500 ml-2">remaining</span>
                                     </div>
                                 </div>
@@ -50,7 +50,7 @@ export default function Home() {
                                     className="text-purple-600 hover:text-purple-800 font-medium transition-colors"
                                 >
                                     {!loading && userDetails?.name 
-                                        ? `${userDetails.name.split(" ")[0]}, get unlimited` 
+                                        ? `Welcome ${userDetails.name.split(" ")[0]}` 
                                         : "Get unlimited sessions"}
                                 </a>
                             </div>
@@ -59,7 +59,7 @@ export default function Home() {
                                 <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
-                                <span>Join 5,000+ successful candidates</span>
+                                <span>Ace interviews</span>
                             </div>
                         </div>
                     </div>

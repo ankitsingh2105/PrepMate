@@ -6,6 +6,13 @@ import { useLocation } from 'react-router-dom';
 import { useSelector } from "react-redux";
 import { ToastContainer, toast } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
+import {
+    Mic,
+    MicOff,
+    Video,
+    VideoOff,
+    Copy
+} from "lucide-react";
 
 export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, direction = 'row' }) {
     const socket = useSocket();
@@ -94,7 +101,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         if (audioTrack) {
             audioTrack.enabled = !audioTrack.enabled;
             setIsAudioMuted(!audioTrack.enabled);
-            toast.info(audioTrack.enabled ? "Microphone unmuted" : "Microphone muted", { autoClose: 1500 });
+            toast.info(audioTrack.enabled ? "Microphone unmuted" : "Microphone muted", { autoClose: 500 });
             console.log("Audio track toggled:", { enabled: audioTrack.enabled });
         } else {
             // toast.warn("No audio track available", { autoClose: 1500 });
@@ -110,7 +117,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         if (videoTrack) {
             videoTrack.enabled = !videoTrack.enabled;
             setIsVideoOff(!videoTrack.enabled);
-            toast.info(videoTrack.enabled ? "Video turned on" : "Video turned off", { autoClose: 1500 });
+            toast.info(videoTrack.enabled ? "Video turned on" : "Video turned off", { autoClose: 500 });
             console.log("Video track toggled:", { enabled: videoTrack.enabled });
         } else {
             // toast.warn("No video track available", { autoClose: 1500 });
@@ -370,14 +377,14 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                             <span className="text-xs text-gray-600 truncate max-w-[200px]">
                                 {currentPageUrl}
                             </span>
+                        </div>
                             <button
                                 onClick={() => handleCopy(currentPageUrl)}
-                                className="ml-2 text-purple-600 hover:text-purple-800 transition-colors"
+                                className="ml-2 text-green-500 hover:text-purple-800 transition-colors"
                                 aria-label="Copy link"
                             >
-                                <i className="bi bi-clipboard"></i>
+                                <Copy/>
                             </button>
-                        </div>
                     </div>
 
                     <div className="mb-4">
@@ -405,40 +412,30 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                     muted
                                     onError={(e) => console.error("Local ReactPlayer error:", e)}
                                 />
-                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold flex justify-between items-center">
+                                <br />
+                                <div className="absolute bottom-0 left-0 right-0 bg-purple-600 text-white bg-opacity-100 py-1 px-3 text-sm font-semibold flex justify-between items-center">
                                     <span>You</span>
                                     <div className="flex space-x-2">
                                         <button
                                             onClick={handleToggleAudio}
-                                            className={`p-1 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-gray-700'} text-white hover:bg-opacity-80 transition-colors`}
+                                            className={`p-1 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-green-500'} text-white hover:bg-opacity-80 transition-colors`}
                                             aria-label={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
                                         >
-                                            <i className={`bi ${isAudioMuted ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
+                                            {!isAudioMuted ? <Mic size={20} /> : <MicOff size={20} />}
                                         </button>
                                         <button
                                             onClick={handleToggleVideo}
-                                            className={`p-1 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-700'} text-white hover:bg-opacity-80 transition-colors`}
+                                            className={`p-1 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-green-500'} text-white hover:bg-opacity-80 transition-colors`}
                                             aria-label={isVideoOff ? "Turn video on" : "Turn video off"}
                                         >
-                                            <i className={`bi ${isVideoOff ? 'bi-camera-video-off-fill' : 'bi-camera-video-fill'}`}></i>
+                                            {!isVideoOff ? (
+                                                <Video size={20} />
+                                            ) : (
+                                                <VideoOff size={20} />
+                                            )}
+
                                         </button>
                                     </div>
-                                </div>
-                                <div className="flex space-x-2">
-                                    <button
-                                        onClick={handleToggleAudio}
-                                        className={`p-1 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-gray-700'} text-white hover:bg-opacity-80 transition-colors`}
-                                        aria-label={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
-                                    >
-                                        <i className={`bi ${isAudioMuted ? 'bi-mic-mute-fill' : 'bi-mic-fill'}`}></i>
-                                    </button>
-                                    <button
-                                        onClick={handleToggleVideo}
-                                        className={`p-1 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-700'} text-white hover:bg-opacity-80 transition-colors`}
-                                        aria-label={isVideoOff ? "Turn video on" : "Turn video off"}
-                                    >
-                                        <i className={`bi ${isVideoOff ? 'bi-camera-video-off-fill' : 'bi-camera-video-fill'}`}></i>
-                                    </button>
                                 </div>
                             </div>
                         )}
