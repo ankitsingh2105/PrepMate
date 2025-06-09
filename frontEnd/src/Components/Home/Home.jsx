@@ -17,7 +17,7 @@ export default function Home() {
     }
     
     return (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50">
+        <div className="p-12 pt-0 pb-0 bg-gradient-to-br from-indigo-50 to-purple-50">
             <div className="container mx-auto px-4 py-12">
                 <main className="flex flex-col md:flex-row items-center justify-between gap-12">
                     <div className="max-w-xl">
