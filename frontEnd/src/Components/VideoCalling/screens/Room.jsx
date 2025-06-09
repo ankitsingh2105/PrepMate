@@ -79,14 +79,23 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
 
     const handleUserJoined = useCallback((data) => {
         const { email, socketID } = data;
+        if (socketID === socket.id) {
+            console.log("Ignoring self in user:joined");
+            return;
+        }
         console.log("New user joined:", data);
         setRemoteSocketId(socketID);
         toast.info(`User ${email} joined the room`, { autoClose: 1500 });
-    }, []);
+    }, [socket.id]);
 
     const sendStreams = useCallback(() => {
-        if (!myStream || !myStream.getTracks() || tracksAddedRef.current) {
-            console.warn("sendStreams: No stream, no tracks, or tracks already added");
+        if (!myStream || !myStream.getTracks() || myStream.getTracks().length === 0) {
+            console.warn("sendStreams: No stream or no valid tracks");
+            toast.error("No valid stream to send", { autoClose: 1500 });
+            return;
+        }
+        if (tracksAddedRef.current) {
+            console.warn("sendStreams: Tracks already added");
             return;
         }
         console.log("Adding tracks from myStream:", myStream.getTracks());
@@ -201,7 +210,8 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     useEffect(() => {
         peer.webRTCPeer.addEventListener("track", async (e) => {
             const remoteStreams = e.streams;
-            console.log("Received remote streams:", remoteStreams, "Tracks:", e.streams[0]?.getTracks());
+            console.log("Received remote streams:", remoteStreams);
+            console.log("Tracks:", remoteStreams[0]?.getTracks());
             if (remoteStreams && remoteStreams[0]) {
                 setRemoteStream(remoteStreams[0]);
                 toast.success("Remote stream received", { autoClose: 1500 });
@@ -252,7 +262,12 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         socket.on("peer:nego:final", handleNegoFinal);
         socket.on("ice:candidate", async ({ candidate }) => {
             console.log("Received ICE candidate:", candidate);
-            await peer.addIceCandidate(candidate);
+            try {
+                await peer.addIceCandidate(candidate);
+            } catch (error) {
+                console.error("Error adding ICE candidate:", error);
+                toast.error("Failed to add ICE candidate", { autoClose: 1500 });
+            }
         });
         socket.on("user:left", ({ socketID }) => {
             if (socketID === remoteSocketId) {
@@ -339,6 +354,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                     url={myStream}
                                     playing
                                     muted
+                                    onError={(e) => console.error("Local ReactPlayer error:", e)}
                                 />
                                 <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold">
                                     You
@@ -353,7 +369,8 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                         width={roomWidth}
                                         height={roomHeight}
                                         url={remoteStream}
-                                        playing
+                                        playing={true}
+                                        onError={(e) => console.error("Remote ReactPlayer error:", e)}
                                     />
                                     <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold">
                                         {otherUsername || 'Participant'}

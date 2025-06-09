@@ -48,10 +48,7 @@ interviewNamespace.on("connection", (socket) => {
   socket.on("room:join", ({ email, room }) => {
     const data = { email, room, socketID: socket.id };
     socket.join(room);
-    // Emit to other clients in the room, excluding the joining socket
-    socket.to(room).emit("user:joined", data);
-    // Emit room:join to the joining socket
-    interviewNamespace.to(socket.id).emit("room:join", data);
+    socket.to(room).emit("user:joined", data); // Only emit to others in the room
   });
 
   socket.on("user:call", ({ sendername, to, offer }) => {
@@ -72,6 +69,17 @@ interviewNamespace.on("connection", (socket) => {
   socket.on("peer:nego:done", ({ to, ans }) => {
     console.log(`peer:nego:done from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("peer:nego:final", { from: socket.id, ans });
+  });
+
+  socket.on("ice:candidate", ({ to, candidate }) => {
+    console.log(`ice:candidate from ${socket.id} to ${to}`);
+    interviewNamespace.to(to).emit("ice:candidate", { candidate });
+  });
+
+  socket.on("disconnect", () => {
+    socket.rooms.forEach((room) => {
+      socket.to(room).emit("user:left", { socketID: socket.id });
+    });
   });
 });
 
