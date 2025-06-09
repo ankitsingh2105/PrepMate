@@ -451,7 +451,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                         muted={false}
                                         onError={(e) => console.error("Remote ReactPlayer error:", e)}
                                     />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold">
+                                    <div className="absolute bottom-0 left-0 right-0 bg-purple-600 bg-opacity-100 text-white py-1 px-3 text-sm font-semibold">
                                         {otherUsername || 'Participant'}
                                     </div>
                                 </div>

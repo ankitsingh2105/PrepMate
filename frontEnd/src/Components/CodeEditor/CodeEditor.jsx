@@ -20,10 +20,28 @@ function CodeEditor() {
 
     const toBase64 = (str) => window.btoa(unescape(encodeURIComponent(str)));
 
+    function throttleFunction(func, delay) {
+        let throttle = false;
+        return function (...args) {
+            if (throttle) return;
+            throttle = true;
+            func(...args);
+            setTimeout(() => {
+                throttle = false;
+            }, delay);
+        }
+    }
+
+    function sendCodeChanges(room, value) {
+        socket.emit("user:codeChange", { room, sourceCode: value });
+    }
+
+    const throttleSendCode = throttleFunction(sendCodeChanges, 200);
+
     const handleEditorChange = (value) => {
         setSourceCode(value);
         lastSentCode.current = value;
-        socket.emit("user:codeChange", { room, sourceCode: value });
+        throttleSendCode(room, value);
     };
 
     const submitCode = async () => {
@@ -161,7 +179,7 @@ function CodeEditor() {
                     Submit
                 </button>
                 <button
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 transition"
                     onClick={getResult}
                 >
                     Get Result
