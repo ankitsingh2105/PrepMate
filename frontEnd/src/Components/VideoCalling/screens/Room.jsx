@@ -28,7 +28,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const pendingCallRef = useRef(null);
 
     const location = useLocation();
-    const currentPageUrl = `https://prep-mate-one.vercel.app${location.pathname}`;
+    const currentPageUrl = `https://prepmatee.vercel.app${location.pathname}`;
     useEffect(() => {
         toast.info("Copy the link and send to a friend", { autoClose: 1500 });
     }, []);
