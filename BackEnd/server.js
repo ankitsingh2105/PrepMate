@@ -46,39 +46,42 @@ const notificationNamespace = io.of("/notification");
 // Interview (WebRTC) namespace
 interviewNamespace.on("connection", (socket) => {
   socket.on("room:join", ({ email, room }) => {
-    const data = { email, room, socketID: socket.id };
+    console.log(`Socket ${socket.id} joining room ${room}`);
     socket.join(room);
-    socket.to(room).emit("user:joined", data); // Only emit to others in the room
+    socket.to(room).emit("user:joined", { email, socketID: socket.id, room });
   });
 
-  socket.on("user:call", ({ sendername, to, offer }) => {
-    console.log(`user:call from ${socket.id} to ${to}`);
-    interviewNamespace.to(to).emit("incoming:call", { sendername, from: socket.id, offer });
+  socket.on("user:call", ({ sendername, to, offer, room }) => {
+    console.log(`user:call from ${socket.id} to ${to} in room ${room}`);
+    interviewNamespace.to(to).emit("incoming:call", { sendername, from: socket.id, offer, room });
   });
 
-  socket.on("call:accepted", ({ to, ans }) => {
-    console.log(`call:accepted from ${socket.id} to ${to}`);
-    interviewNamespace.to(to).emit("call:accepted", { from: socket.id, ans });
+  socket.on("call:accepted", ({ to, ans, room }) => {
+    console.log(`call:accepted from ${socket.id} to ${to} in room ${room}`);
+    interviewNamespace.to(to).emit("call:accepted", { from: socket.id, ans, room });
   });
 
-  socket.on("peer:nego:needed", ({ to, offer }) => {
-    console.log(`peer:nego:needed from ${socket.id} to ${to}`);
-    interviewNamespace.to(to).emit("peer:nego:needed", { from: socket.id, offer });
+  socket.on("peer:nego:needed", ({ to, offer, room }) => {
+    console.log(`peer:nego:needed from ${socket.id} to ${to} in room ${room}`);
+    interviewNamespace.to(to).emit("peer:nego:needed", { from: socket.id, offer, room });
   });
 
-  socket.on("peer:nego:done", ({ to, ans }) => {
-    console.log(`peer:nego:done from ${socket.id} to ${to}`);
-    interviewNamespace.to(to).emit("peer:nego:final", { from: socket.id, ans });
+  socket.on("peer:nego:done", ({ to, ans, room }) => {
+    console.log(`peer:nego:done from ${socket.id} to ${to} in room ${room}`);
+    interviewNamespace.to(to).emit("peer:nego:final", { from: socket.id, ans, room });
   });
 
-  socket.on("ice:candidate", ({ to, candidate }) => {
-    console.log(`ice:candidate from ${socket.id} to ${to}`);
-    interviewNamespace.to(to).emit("ice:candidate", { candidate });
+  socket.on("ice:candidate", ({ to, candidate, room }) => {
+    console.log(`ice:candidate from ${socket.id} to ${to} in room ${room}`);
+    interviewNamespace.to(to).emit("ice:candidate", { candidate, room });
   });
 
   socket.on("disconnect", () => {
     socket.rooms.forEach((room) => {
-      socket.to(room).emit("user:left", { socketID: socket.id });
+      if (room !== socket.id) { // Exclude default room (socket.id)
+        console.log(`Socket ${socket.id} disconnected from room ${room}`);
+        socket.to(room).emit("user:left", { socketID: socket.id, room });
+      }
     });
   });
 });
@@ -86,14 +89,17 @@ interviewNamespace.on("connection", (socket) => {
 // Code Edit namespace
 codeEditNamespace.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
+    console.log(`Socket ${socket.id} joining code-edit room ${room}`);
     socket.join(room);
   });
 
   socket.on("user:codeChange", ({ room, sourceCode }) => {
+    console.log(`Code change in room ${room}`);
     codeEditNamespace.to(room).emit("user:codeChangeAccepted", { sourceCode });
   });
 
   socket.on("getOutput", ({ decodedOutput, room }) => {
+    console.log(`Output received in room ${room}`);
     codeEditNamespace.to(room).emit("getOutput", { decodedOutput });
   });
 });
@@ -104,17 +110,22 @@ let userSocketMap = new Map();
 notificationNamespace.on("connection", (socket) => {
   socket.on('register', (userId) => {
     userSocketMap.set(userId, socket.id);
+    console.log(`User ${userId} registered with socket ${socket.id}`);
   });
 
   socket.on('disconnect', () => {
     for (const [userId, sockId] of userSocketMap.entries()) {
-      if (sockId === socket.id) userSocketMap.delete(userId);
+      if (sockId === socket.id) {
+        userSocketMap.delete(userId);
+        console.log(`User ${userId} disconnected`);
+      }
     }
   });
 
   socket.on("notification", ({ message, otherUserId }) => {
     const otherUserSocketId = userSocketMap.get(otherUserId);
     if (otherUserSocketId) {
+      console.log(`Sending notification to user ${otherUserId}`);
       notificationNamespace.to(otherUserSocketId).emit("notification", { message });
     }
   });

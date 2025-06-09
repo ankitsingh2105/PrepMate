@@ -15,11 +15,15 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const [remoteStream, setRemoteStream] = useState(null);
     const [inComingCall, setInComingCall] = useState(false);
     const [otherUsername, setOtherUsername] = useState("");
+    const [isAudioMuted, setIsAudioMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
     const tracksAddedRef = useRef(false);
     const pendingCallRef = useRef(null);
 
     const location = useLocation();
     const currentPageUrl = `https://prep-mate-one.vercel.app${location.pathname}`;
+    const currentRoom = location.pathname.split("/")[2]; // Extract room ID from URL
+
     useEffect(() => {
         toast.info("Copy the link and send to a friend", { autoClose: 1500 });
     }, []);
@@ -34,16 +38,24 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                 audio: true,
                 video: true
             });
+            const audioTracks = stream.getAudioTracks();
+            const videoTracks = stream.getVideoTracks();
+            console.log("Initialized stream for room", currentRoom, ":", {
+                audioTracks: audioTracks.map(t => ({ enabled: t.enabled, label: t.label })),
+                videoTracks: videoTracks.map(t => ({ enabled: t.enabled, label: t.label }))
+            });
+            if (audioTracks.length === 0) {
+                toast.warn("No audio track available in stream", { autoClose: 1500 });
+            }
             setMyStream(stream);
-            console.log("Initialized myStream with tracks:", stream.getTracks());
             toast.success("Local stream initialized", { autoClose: 1500 });
             return stream;
         } catch (error) {
-            console.error("Error accessing media devices:", error);
-            toast.error("Failed to access media devices", { autoClose: 1500 });
+            console.error("Error accessing media devices in room", currentRoom, ":", error);
+            toast.error(`Failed to access media devices: ${error.message}`, { autoClose: 1500 });
             return null;
         }
-    }, []);
+    }, [currentRoom]);
 
     const handleSubmit = useCallback(() => {
         const room = url.pathname.split("/")[2];
@@ -72,133 +84,190 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             isMounted = false;
             if (myStream) {
                 myStream.getTracks().forEach(track => track.stop());
-                console.log("Stopped myStream tracks");
+                console.log("Stopped myStream tracks in room", currentRoom);
             }
         };
-    }, [userDetails, initializeStream, handleSubmit]);
+    }, [userDetails, initializeStream, handleSubmit, currentRoom, myStream]);
 
-    const handleUserJoined = useCallback((data) => {
-        const { email, socketID } = data;
-        if (socketID === socket.id) {
-            console.log("Ignoring self in user:joined");
+    const handleToggleAudio = useCallback(() => {
+        if (!myStream) {
+            toast.error("No stream available to mute/unmute", { autoClose: 1500 });
             return;
         }
-        console.log("New user joined:", data);
+        const audioTrack = myStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            setIsAudioMuted(!audioTrack.enabled);
+            toast.info(audioTrack.enabled ? "Microphone unmuted" : "Microphone muted", { autoClose: 1500 });
+            console.log("Audio track toggled in room", currentRoom, ":", { enabled: audioTrack.enabled });
+        } else {
+            toast.warn("No audio track available", { autoClose: 1500 });
+        }
+    }, [myStream, currentRoom]);
+
+    const handleToggleVideo = useCallback(() => {
+        if (!myStream) {
+            toast.error("No stream available to turn video on/off", { autoClose: 1500 });
+            return;
+        }
+        const videoTrack = myStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            setIsVideoOff(!videoTrack.enabled);
+            toast.info(videoTrack.enabled ? "Video turned on" : "Video turned off", { autoClose: 1500 });
+            console.log("Video track toggled in room", currentRoom, ":", { enabled: videoTrack.enabled });
+        } else {
+            toast.warn("No video track available", { autoClose: 1500 });
+        }
+    }, [myStream, currentRoom]);
+
+    const handleUserJoined = useCallback((data) => {
+        const { email, socketID, room } = data;
+        if (socketID === socket.id) {
+            console.log("Ignoring self in user:joined for room", room);
+            return;
+        }
+        if (room !== currentRoom) {
+            console.log("Ignoring user:joined from different room:", room, "Current room:", currentRoom);
+            return;
+        }
+        console.log("New user joined room", room, ":", data);
         setRemoteSocketId(socketID);
         toast.info(`User ${email} joined the room`, { autoClose: 1500 });
-    }, [socket.id]);
+    }, [socket.id, currentRoom]);
 
     const sendStreams = useCallback(() => {
         if (!myStream || !myStream.getTracks() || myStream.getTracks().length === 0) {
-            console.warn("sendStreams: No stream or no valid tracks");
+            console.warn("sendStreams: No stream or no valid tracks in room", currentRoom);
             toast.error("No valid stream to send", { autoClose: 1500 });
             return;
         }
         if (tracksAddedRef.current) {
-            console.warn("sendStreams: Tracks already added");
+            console.warn("sendStreams: Tracks already added in room", currentRoom);
             return;
         }
-        console.log("Adding tracks from myStream:", myStream.getTracks());
-        for (const track of myStream.getTracks()) {
+        const tracks = myStream.getTracks();
+        console.log("Adding tracks in room", currentRoom, ":", tracks.map(t => ({ kind: t.kind, enabled: t.enabled, label: t.label })));
+        for (const track of tracks) {
+            if (track.kind === 'audio' && !track.enabled) {
+                console.warn("Audio track is disabled in room", currentRoom, ":", track);
+                toast.warn("Audio track is disabled", { autoClose: 1500 });
+            }
             peer.webRTCPeer.addTrack(track, myStream);
         }
         tracksAddedRef.current = true;
-    }, [myStream]);
+    }, [myStream, currentRoom]);
 
     const initiateCall = useCallback(async () => {
         if (!myStream) {
             toast.error("Local stream not available", { autoClose: 1500 });
-            console.error("initiateCall: Local stream not available");
+            console.error("initiateCall: Local stream not available in room", currentRoom);
             return;
         }
-        console.log("Initiating call to", remoteSocketId);
+        console.log("Initiating call to", remoteSocketId, "in room", currentRoom);
         try {
             const offer = await peer.getOffer();
+            console.log("Offer SDP in room", currentRoom, ":", offer.sdp);
             const name = userDetails.name;
-            socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
+            socket.emit("user:call", { sendername: name, to: remoteSocketId, offer, room: currentRoom });
             sendStreams();
             toast.info("Initiating call...", { autoClose: 1500 });
-            console.log("Offer sent:", offer);
         } catch (error) {
-            console.error("Error initiating call:", error);
+            console.error("Error initiating call in room", currentRoom, ":", error);
             toast.error("Failed to initiate call", { autoClose: 1500 });
         }
-    }, [remoteSocketId, socket, userDetails, myStream, sendStreams]);
+    }, [remoteSocketId, socket, userDetails, myStream, sendStreams, currentRoom]);
 
-    const handleIncomingCall = useCallback(async ({ sendername, from, offer }) => {
+    const handleIncomingCall = useCallback(async ({ sendername, from, offer, room }) => {
+        if (room !== currentRoom) {
+            console.log("Ignoring incoming:call from different room:", room, "Current room:", currentRoom);
+            return;
+        }
         if (!myStream) {
-            console.warn("handleIncomingCall: Local stream not available, queuing call");
-            pendingCallRef.current = { sendername, from, offer };
+            console.warn("handleIncomingCall: Local stream not available, queuing call in room", currentRoom);
+            pendingCallRef.current = { sendername, from, offer, room };
             return;
         }
         setOtherUsername(sendername);
         setInComingCall(true);
         setRemoteSocketId(from);
-        console.log("Incoming call from", sendername, from, "Offer:", offer);
+        console.log("Incoming call from", sendername, from, "in room", room, "Offer SDP:", offer.sdp);
         toast.info(`Incoming call from ${sendername}`, { autoClose: 1500 });
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(offer));
             const ans = await peer.getAnswer(offer);
-            socket.emit("call:accepted", { to: from, ans });
+            console.log("Answer SDP in room", room, ":", ans.sdp);
+            socket.emit("call:accepted", { to: from, ans, room: currentRoom });
             sendStreams();
-            console.log("Answer sent:", ans);
         } catch (error) {
-            console.error("Error accepting call:", error);
+            console.error("Error accepting call in room", room, ":", error);
             toast.error("Failed to accept call", { autoClose: 1500 });
         }
-    }, [socket, myStream, sendStreams]);
+    }, [socket, myStream, sendStreams, currentRoom]);
 
-    useEffect(() => {
-        if (myStream && pendingCallRef.current) {
-            console.log("Processing queued incoming call");
-            const { sendername, from, offer } = pendingCallRef.current;
-            handleIncomingCall({ sendername, from, offer });
-            pendingCallRef.current = null;
+    const handleAcceptCall = useCallback(async ({ from, ans, room }) => {
+        if (room !== currentRoom) {
+            console.log("Ignoring call:accepted from different room:", room, "Current room:", currentRoom);
+            return;
         }
-    }, [myStream, handleIncomingCall]);
-
-    const handleAcceptCall = useCallback(async ({ from, ans }) => {
-        console.log("Call accepted from", from, "Answer:", ans);
+        console.log("Call accepted from", from, "in room", room, "Answer:", ans);
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(ans));
             toast.success("Call accepted", { autoClose: 1500 });
         } catch (error) {
-            console.error("Error accepting call:", error);
+            console.error("Error accepting call in room", room, ":", error);
             toast.error("Failed to accept call", { autoClose: 1500 });
         }
-    }, []);
+    }, [currentRoom]);
 
     const handleNegoNeeded = useCallback(async () => {
         try {
             const offer = await peer.getOffer();
-            socket.emit("peer:nego:needed", { to: remoteSocketId, offer });
-            console.log("Negotiation needed, offer sent to", remoteSocketId, offer);
+            socket.emit("peer:nego:needed", { to: remoteSocketId, offer, room: currentRoom });
+            console.log("Negotiation needed, offer sent to", remoteSocketId, "in room", currentRoom);
         } catch (error) {
-            console.error("Error in negotiation:", error);
+            console.error("Error in negotiation in room", currentRoom, ":", error);
             toast.error("Negotiation failed", { autoClose: 1500 });
         }
-    }, [socket, remoteSocketId]);
+    }, [socket, remoteSocketId, currentRoom]);
 
-    const handleNegoNeededIncoming = useCallback(async ({ from, offer }) => {
+    const handleNegoNeededIncoming = useCallback(async ({ from, offer, room }) => {
+        if (room !== currentRoom) {
+            console.log("Ignoring peer:nego:needed from different room:", room, "Current room:", currentRoom);
+            return;
+        }
         try {
             const ans = await peer.getAnswer(offer);
-            socket.emit("peer:nego:done", { to: from, ans });
-            console.log("Negotiation answer sent to", from, ans);
+            socket.emit("peer:nego:done", { to: from, ans, room: currentRoom });
+            console.log("Negotiation answer sent to", from, "in room", room);
         } catch (error) {
-            console.error("Error in negotiation incoming:", error);
+            console.error("Error in negotiation incoming in room", room, ":", error);
             toast.error("Negotiation failed", { autoClose: 1500 });
         }
-    }, [socket]);
+    }, [socket, currentRoom]);
 
-    const handleNegoFinal = useCallback(async ({ ans }) => {
+    const handleNegoFinal = useCallback(async ({ ans, room }) => {
+        if (room !== currentRoom) {
+            console.log("Ignoring peer:nego:final from different room:", room, "Current room:", currentRoom);
+            return;
+        }
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(ans));
-            console.log("Negotiation finalized", ans);
+            console.log("Negotiation finalized in room", room);
         } catch (error) {
-            console.error("Error in negotiation final:", error);
+            console.error("Error in negotiation final in room", room, ":", error);
             toast.error("Negotiation failed", { autoClose: 1500 });
         }
-    }, []);
+    }, [currentRoom]);
+
+    useEffect(() => {
+        if (myStream && pendingCallRef.current && pendingCallRef.current.room === currentRoom) {
+            console.log("Processing queued incoming call in room", currentRoom);
+            const { sendername, from, offer, room } = pendingCallRef.current;
+            handleIncomingCall({ sendername, from, offer, room });
+            pendingCallRef.current = null;
+        }
+    }, [myStream, handleIncomingCall, currentRoom]);
 
     useEffect(() => {
         peer.webRTCPeer.addEventListener("negotiationneeded", handleNegoNeeded);
@@ -210,19 +279,23 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     useEffect(() => {
         peer.webRTCPeer.addEventListener("track", async (e) => {
             const remoteStreams = e.streams;
-            console.log("Received remote streams:", remoteStreams);
-            console.log("Tracks:", remoteStreams[0]?.getTracks());
+            console.log("Received remote streams in room", currentRoom, ":", remoteStreams);
             if (remoteStreams && remoteStreams[0]) {
+                const audioTracks = remoteStreams[0].getAudioTracks();
+                console.log("Remote audio tracks in room", currentRoom, ":", audioTracks.map(t => ({ enabled: t.enabled, label: t.label })));
+                if (audioTracks.length === 0) {
+                    toast.warn("No audio track in remote stream", { autoClose: 1500 });
+                }
                 setRemoteStream(remoteStreams[0]);
                 toast.success("Remote stream received", { autoClose: 1500 });
             } else {
-                console.warn("No remote stream received");
+                console.warn("No remote stream received in room", currentRoom);
                 toast.warn("No remote stream available", { autoClose: 1500 });
             }
         });
 
         peer.webRTCPeer.addEventListener("connectionstatechange", () => {
-            console.log("Connection state:", peer.webRTCPeer.connectionState);
+            console.log("Connection state in room", currentRoom, ":", peer.webRTCPeer.connectionState);
             if (peer.webRTCPeer.connectionState === "connected") {
                 toast.success("WebRTC connection established", { autoClose: 1500 });
             } else if (peer.webRTCPeer.connectionState === "failed") {
@@ -233,7 +306,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         });
 
         peer.webRTCPeer.addEventListener("iceconnectionstatechange", () => {
-            console.log("ICE connection state:", peer.webRTCPeer.iceConnectionState);
+            console.log("ICE connection state in room", currentRoom, ":", peer.webRTCPeer.iceConnectionState);
         });
 
         return () => {
@@ -241,17 +314,17 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             peer.webRTCPeer.removeEventListener("connectionstatechange", () => {});
             peer.webRTCPeer.removeEventListener("iceconnectionstatechange", () => {});
         };
-    }, []);
+    }, [currentRoom]);
 
     useEffect(() => {
         if (!peer) {
-            console.error("Peer service is not available");
+            console.error("Peer service is not available in room", currentRoom);
             return;
         }
         peer.setOnIceCandidate((candidate) => {
             if (remoteSocketId) {
-                console.log("Emitting ICE candidate to", remoteSocketId, candidate);
-                socket.emit("ice:candidate", { to: remoteSocketId, candidate });
+                console.log("Emitting ICE candidate to", remoteSocketId, "in room", currentRoom);
+                socket.emit("ice:candidate", { to: remoteSocketId, candidate, room: currentRoom });
             }
         });
 
@@ -260,18 +333,26 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         socket.on("call:accepted", handleAcceptCall);
         socket.on("peer:nego:needed", handleNegoNeededIncoming);
         socket.on("peer:nego:final", handleNegoFinal);
-        socket.on("ice:candidate", async ({ candidate }) => {
-            console.log("Received ICE candidate:", candidate);
+        socket.on("ice:candidate", async ({ candidate, room }) => {
+            if (room !== currentRoom) {
+                console.log("Ignoring ice:candidate from different room:", room, "Current room:", currentRoom);
+                return;
+            }
+            console.log("Received ICE candidate in room", room, ":", candidate);
             try {
                 await peer.addIceCandidate(candidate);
             } catch (error) {
-                console.error("Error adding ICE candidate:", error);
+                console.error("Error adding ICE candidate in room", room, ":", error);
                 toast.error("Failed to add ICE candidate", { autoClose: 1500 });
             }
         });
-        socket.on("user:left", ({ socketID }) => {
+        socket.on("user:left", ({ socketID, room }) => {
+            if (room !== currentRoom) {
+                console.log("Ignoring user:left from different room:", room, "Current room:", currentRoom);
+                return;
+            }
             if (socketID === remoteSocketId) {
-                console.log("User left:", socketID);
+                console.log("User left room", room, ":", socketID);
                 setRemoteSocketId("");
                 setRemoteStream(null);
                 setOtherUsername("");
@@ -290,14 +371,14 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             socket.off("ice:candidate");
             socket.off("user:left");
         };
-    }, [socket, handleUserJoined, handleIncomingCall, handleAcceptCall, handleNegoNeededIncoming, handleNegoFinal, remoteSocketId]);
+    }, [socket, handleUserJoined, handleIncomingCall, handleAcceptCall, handleNegoNeededIncoming, handleNegoFinal, remoteSocketId, currentRoom]);
 
     useEffect(() => {
         if (remoteSocketId && myStream && remoteSocketId !== socket.id) {
-            console.log("Triggering initiateCall for remoteSocketId:", remoteSocketId);
+            console.log("Triggering initiateCall for remoteSocketId:", remoteSocketId, "in room", currentRoom);
             initiateCall();
         }
-    }, [remoteSocketId, myStream, initiateCall, socket.id]);
+    }, [remoteSocketId, myStream, initiateCall, socket.id, currentRoom]);
 
     const handleCopy = (textToCopy) => {
         navigator.clipboard.writeText(textToCopy)
@@ -356,8 +437,24 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                     muted
                                     onError={(e) => console.error("Local ReactPlayer error:", e)}
                                 />
-                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold">
-                                    You
+                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold flex flex-col items-center">
+                                    <span>You</span>
+                                    <div className="flex space-x-4 mt-1">
+                                        <button
+                                            onClick={handleToggleAudio}
+                                            className={`p-1 rounded-full ${isAudioMuted ? 'bg-red-500' : 'bg-gray-700'} text-white hover:bg-opacity-80 transition-colors`}
+                                            aria-label={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
+                                        >
+                                            <span>{isAudioMuted ? '🔇' : '🎤'}</span>
+                                        </button>
+                                        <button
+                                            onClick={handleToggleVideo}
+                                            className={`p-1 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-700'} text-white hover:bg-opacity-80 transition-colors`}
+                                            aria-label={isVideoOff ? "Turn video on" : "Turn video off"}
+                                        >
+                                            <span>{isVideoOff ? '📴' : '📹'}</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -370,6 +467,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                         height={roomHeight}
                                         url={remoteStream}
                                         playing={true}
+                                        muted={false}
                                         onError={(e) => console.error("Remote ReactPlayer error:", e)}
                                     />
                                     <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white py-1 px-3 text-sm font-semibold">
