@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 function CodeEditor() {
     const socket = useSocketforCode();
     const path = useLocation().pathname;
-    const room = path.split("/")[2];
+    const room = path.split("/")[3];
     const lastSentCode = useRef('');
 
     const [sourceCode, setSourceCode] = useState('// code here\n\n');

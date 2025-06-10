@@ -57,7 +57,8 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     }, []);
 
     const handleSubmit = useCallback(() => {
-        const room = url.pathname.split("/")[2];
+        // const room = url.pathname.split("/")[2];
+        const room = url.pathname.split("/")[3];
         if (userDetails && userDetails.email) {
             const email = userDetails.email;
             setLoading(true);

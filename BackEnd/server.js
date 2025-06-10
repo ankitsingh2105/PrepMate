@@ -51,25 +51,22 @@ interviewNamespace.on("connection", (socket) => {
     const data = { email, socketID: socket.id };
     socket.join(room);
 
-    console.log(roomUsers);
-
-    // Add user to roomUsers map
     if (!roomUsers.has(room)) {
       roomUsers.set(room, new Set());
     }
+    if(roomUsers.get(room).size == 2){
+      return;
+    }
     roomUsers.get(room).add(socket.id);
-
-    // Notify only the first user in the room (or implement your own pairing logic)
     const otherUsers = Array.from(roomUsers.get(room)).filter(id => id !== socket.id);
     if (otherUsers.length > 0) {
-      // Emit to a specific user (e.g., the first other user in the room)
-      const targetSocketId = otherUsers[0]; // You can modify this to select a specific user
+      const targetSocketId = otherUsers[0]; 
       interviewNamespace.to(targetSocketId).emit("user:joined", data);
-      // Optionally, send the list of other users to the joining user
       socket.emit("room:users", { users: otherUsers });
     }
 
     console.log(`User ${email} joined room ${room} with socketID ${socket.id}`);
+    console.log(roomUsers);
   });
 
   socket.on("user:call", ({ sendername, to, offer }) => {
