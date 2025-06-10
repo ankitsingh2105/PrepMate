@@ -44,11 +44,30 @@ const codeEditNamespace = io.of("/code-edit");
 const notificationNamespace = io.of("/notification");
 
 // todo :: interview namespace
+const roomUsers = new Map(); // Map to store users in each room
+
 interviewNamespace.on("connection", (socket) => {
   socket.on("room:join", ({ email, room }) => {
-    const data = { email, room, socketID: socket.id };
+    const data = { email, socketID: socket.id };
     socket.join(room);
-    socket.to(room).emit("user:joined", data); 
+
+    // Add user to roomUsers map
+    if (!roomUsers.has(room)) {
+      roomUsers.set(room, new Set());
+    }
+    roomUsers.get(room).add(socket.id);
+
+    // Notify only the first user in the room (or implement your own pairing logic)
+    const otherUsers = Array.from(roomUsers.get(room)).filter(id => id !== socket.id);
+    if (otherUsers.length > 0) {
+      // Emit to a specific user (e.g., the first other user in the room)
+      const targetSocketId = otherUsers[0]; // You can modify this to select a specific user
+      interviewNamespace.to(targetSocketId).emit("user:joined", data);
+      // Optionally, send the list of other users to the joining user
+      socket.emit("room:users", { users: otherUsers });
+    }
+
+    console.log(`User ${email} joined room ${room} with socketID ${socket.id}`);
   });
 
   socket.on("user:call", ({ sendername, to, offer }) => {
@@ -77,9 +96,18 @@ interviewNamespace.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    socket.rooms.forEach((room) => {
-      socket.to(room).emit("user:left", { socketID: socket.id });
-    });
+    // Remove user from roomUsers map
+    for (const [room, users] of roomUsers.entries()) {
+      if (users.has(socket.id)) {
+        users.delete(socket.id);
+        // Notify other users in the room
+        socket.to(room).emit("user:left", { socketID: socket.id });
+        if (users.size === 0) {
+          roomUsers.delete(room);
+        }
+      }
+    }
+    console.log(`User ${socket.id} disconnected`);
   });
 });
 

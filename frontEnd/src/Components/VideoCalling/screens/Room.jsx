@@ -26,6 +26,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const [isVideoOff, setIsVideoOff] = useState(false);
     const tracksAddedRef = useRef(false);
     const pendingCallRef = useRef(null);
+    const isInitiatorRef = useRef(false); // Track if this client is the call initiator
 
     const location = useLocation();
     const currentPageUrl = `https://prepmatee.vercel.app${location.pathname}`;
@@ -43,17 +44,11 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                 audio: true,
                 video: true
             });
-            const audioTracks = stream.getAudioTracks();
-            const videoTracks = stream.getVideoTracks();
             console.log("Initialized stream:", {
-                audioTracks: audioTracks.map(t => ({ enabled: t.enabled, label: t.label })),
-                videoTracks: videoTracks.map(t => ({ enabled: t.enabled, label: t.label }))
+                audioTracks: stream.getAudioTracks().map(t => ({ enabled: t.enabled, label: t.label })),
+                videoTracks: stream.getVideoTracks().map(t => ({ enabled: t.enabled, label: t.label }))
             });
-            if (audioTracks.length === 0) {
-                // toast.warn("No audio track available in stream", { autoClose: 1500 });
-            }
             setMyStream(stream);
-            // toast.success("Local stream initialized", { autoClose: 1500 });
             return stream;
         } catch (error) {
             console.error("Error accessing media devices:", error);
@@ -93,34 +88,24 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     }, [userDetails, initializeStream, handleSubmit]);
 
     const handleToggleAudio = useCallback(() => {
-        if (!myStream) {
-            // toast.error("No stream available to mute/unmute", { autoClose: 1500 });
-            return;
-        }
+        if (!myStream) return;
         const audioTrack = myStream.getAudioTracks()[0];
         if (audioTrack) {
             audioTrack.enabled = !audioTrack.enabled;
             setIsAudioMuted(!audioTrack.enabled);
             toast.info(audioTrack.enabled ? "Microphone unmuted" : "Microphone muted", { autoClose: 500 });
             console.log("Audio track toggled:", { enabled: audioTrack.enabled });
-        } else {
-            // toast.warn("No audio track available", { autoClose: 1500 });
         }
     }, [myStream]);
 
     const handleToggleVideo = useCallback(() => {
-        if (!myStream) {
-            // toast.error("No stream available to turn video on/off", { autoClose: 1500 });
-            return;
-        }
+        if (!myStream) return;
         const videoTrack = myStream.getVideoTracks()[0];
         if (videoTrack) {
             videoTrack.enabled = !videoTrack.enabled;
             setIsVideoOff(!videoTrack.enabled);
             toast.info(videoTrack.enabled ? "Video turned on" : "Video turned off", { autoClose: 500 });
             console.log("Video track toggled:", { enabled: videoTrack.enabled });
-        } else {
-            // toast.warn("No video track available", { autoClose: 1500 });
         }
     }, [myStream]);
 
@@ -132,13 +117,14 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         }
         console.log("New user joined:", data);
         setRemoteSocketId(socketID);
+        setOtherUsername(email);
+        isInitiatorRef.current = true; // This client will initiate the call
         toast.info(`User ${email} joined the room`, { autoClose: 1500 });
     }, [socket.id]);
 
     const sendStreams = useCallback(() => {
         if (!myStream || !myStream.getTracks() || myStream.getTracks().length === 0) {
             console.warn("sendStreams: No stream or no valid tracks");
-            // toast.error("No valid stream to send", { autoClose: 1500 });
             return;
         }
         if (tracksAddedRef.current) {
@@ -148,19 +134,14 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         const tracks = myStream.getTracks();
         console.log("Adding tracks:", tracks.map(t => ({ kind: t.kind, enabled: t.enabled, label: t.label })));
         for (const track of tracks) {
-            if (track.kind === 'audio' && !track.enabled) {
-                console.warn("Audio track is disabled:", track);
-                // toast.warn("Audio track is disabled", { autoClose: 1500 });
-            }
             peer.webRTCPeer.addTrack(track, myStream);
         }
         tracksAddedRef.current = true;
     }, [myStream]);
 
     const initiateCall = useCallback(async () => {
-        if (!myStream) {
-            // toast.error("Local stream not available", { autoClose: 1500 });
-            console.error("initiateCall: Local stream not available");
+        if (!myStream || !isInitiatorRef.current) {
+            console.error("initiateCall: Not initiator or no stream");
             return;
         }
         console.log("Initiating call to", remoteSocketId);
@@ -170,10 +151,8 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             const name = userDetails.name;
             socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
             sendStreams();
-            // toast.info("Initiating call...", { autoClose: 1500 });
         } catch (error) {
             console.error("Error initiating call:", error);
-            // toast.error("Failed to initiate call", { autoClose: 1500 });
         }
     }, [remoteSocketId, socket, userDetails, myStream, sendStreams]);
 
@@ -194,9 +173,9 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             console.log("Answer SDP:", ans.sdp);
             socket.emit("call:accepted", { to: from, ans });
             sendStreams();
+            isInitiatorRef.current = false; // This client is not the initiator
         } catch (error) {
             console.error("Error accepting call:", error);
-            // toast.error("Failed to accept call", { autoClose: 1500 });
         }
     }, [socket, myStream, sendStreams]);
 
@@ -216,7 +195,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             toast.success("Call accepted", { autoClose: 1500 });
         } catch (error) {
             console.error("Error accepting call:", error);
-            // toast.error("Failed to accept call", { autoClose: 1500 });
         }
     }, []);
 
@@ -227,7 +205,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             console.log("Negotiation needed, offer sent to", remoteSocketId);
         } catch (error) {
             console.error("Error in negotiation:", error);
-            // toast.error("Negotiation failed", { autoClose: 1500 });
         }
     }, [socket, remoteSocketId]);
 
@@ -238,7 +215,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             console.log("Negotiation answer sent to", from);
         } catch (error) {
             console.error("Error in negotiation incoming:", error);
-            // toast.error("Negotiation failed", { autoClose: 1500 });
         }
     }, [socket]);
 
@@ -248,7 +224,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             console.log("Negotiation finalized");
         } catch (error) {
             console.error("Error in negotiation final:", error);
-            // toast.error("Negotiation failed", { autoClose: 1500 });
         }
     }, []);
 
@@ -264,38 +239,23 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             const remoteStreams = e.streams;
             console.log("Received remote streams:", remoteStreams);
             if (remoteStreams && remoteStreams[0]) {
-                const audioTracks = remoteStreams[0].getAudioTracks();
-                console.log("Remote audio tracks:", audioTracks.map(t => ({ enabled: t.enabled, label: t.label })));
-                if (audioTracks.length === 0) {
-                    // toast.warn("No audio track in remote stream", { autoClose: 1500 });
-                }
                 setRemoteStream(remoteStreams[0]);
-                // toast.success("Remote stream received", { autoClose: 1500 });
             } else {
                 console.warn("No remote stream received");
-                // toast.warn("No remote stream available", { autoClose: 1500 });
             }
         });
 
         peer.webRTCPeer.addEventListener("connectionstatechange", () => {
             console.log("Connection state:", peer.webRTCPeer.connectionState);
-            if (peer.webRTCPeer.connectionState === "connected") {
-                // toast.success("WebRTC connection established", { autoClose: 1500 });
-            } else if (peer.webRTCPeer.connectionState === "failed") {
-                // toast.error("WebRTC connection failed", { autoClose: 1500 });
+            if (peer.webRTCPeer.connectionState === "failed") {
                 peer.resetConnection();
                 tracksAddedRef.current = false;
             }
         });
 
-        peer.webRTCPeer.addEventListener("iceconnectionstatechange", () => {
-            console.log("ICE connection state:", peer.webRTCPeer.iceConnectionState);
-        });
-
         return () => {
-            peer.webRTCPeer.removeEventListener("track", () => { });
-            peer.webRTCPeer.removeEventListener("connectionstatechange", () => { });
-            peer.webRTCPeer.removeEventListener("iceconnectionstatechange", () => { });
+            peer.webRTCPeer.removeEventListener("track", () => {});
+            peer.webRTCPeer.removeEventListener("connectionstatechange", () => {});
         };
     }, []);
 
@@ -322,7 +282,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                 await peer.addIceCandidate(candidate);
             } catch (error) {
                 console.error("Error adding ICE candidate:", error);
-                // toast.error("Failed to add ICE candidate", { autoClose: 1500 });
             }
         });
         socket.on("user:left", ({ socketID }) => {
@@ -349,7 +308,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     }, [socket, handleUserJoined, handleIncomingCall, handleAcceptCall, handleNegoNeededIncoming, handleNegoFinal, remoteSocketId]);
 
     useEffect(() => {
-        if (remoteSocketId && myStream && remoteSocketId !== socket.id) {
+        if (remoteSocketId && myStream && remoteSocketId !== socket.id && isInitiatorRef.current) {
             console.log("Triggering initiateCall for remoteSocketId:", remoteSocketId);
             initiateCall();
         }
@@ -362,7 +321,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             })
             .catch((error) => {
                 console.error('Failed to copy text:', error);
-                // toast.error('Failed to copy text.', { autoClose: 1500 });
             });
     };
 
@@ -378,13 +336,13 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                 {currentPageUrl}
                             </span>
                         </div>
-                            <button
-                                onClick={() => handleCopy(currentPageUrl)}
-                                className="ml-2 text-green-500 hover:text-purple-800 transition-colors"
-                                aria-label="Copy link"
-                            >
-                                <Copy/>
-                            </button>
+                        <button
+                            onClick={() => handleCopy(currentPageUrl)}
+                            className="ml-2 text-green-500 hover:text-purple-800 transition-colors"
+                            aria-label="Copy link"
+                        >
+                            <Copy />
+                        </button>
                     </div>
 
                     <div className="mb-4">
@@ -412,7 +370,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                     muted
                                     onError={(e) => console.error("Local ReactPlayer error:", e)}
                                 />
-                                <br />
                                 <div className="absolute bottom-0 left-0 right-0 bg-purple-600 text-white bg-opacity-100 py-1 px-3 text-sm font-semibold flex justify-between items-center">
                                     <span>You</span>
                                     <div className="flex space-x-2">
@@ -428,12 +385,7 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                                             className={`p-1 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-green-500'} text-white hover:bg-opacity-80 transition-colors`}
                                             aria-label={isVideoOff ? "Turn video on" : "Turn video off"}
                                         >
-                                            {!isVideoOff ? (
-                                                <Video size={20} />
-                                            ) : (
-                                                <VideoOff size={20} />
-                                            )}
-
+                                            {!isVideoOff ? <Video size={20} /> : <VideoOff size={20} />}
                                         </button>
                                     </div>
                                 </div>

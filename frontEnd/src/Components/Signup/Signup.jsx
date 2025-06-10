@@ -65,7 +65,7 @@ const Signup = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 pb-10 px-4 sm:px-6 lg:px-8">
             <ToastContainer position="top-right" autoClose={3000} />
             
             <div className="max-w-md w-full space-y-8">
@@ -232,19 +232,6 @@ const Signup = () => {
                             {confirmPassword && password !== confirmPassword && (
                                 <p className="mt-1 text-sm text-red-600">Passwords don't match</p>
                             )}
-                        </div>
-
-                        <div className="flex items-center">
-                            <input
-                                id="terms"
-                                name="terms"
-                                type="checkbox"
-                                required
-                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                            />
-                            <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
-                                I agree to the <a href="#" className="text-purple-600 hover:text-purple-500">Terms of Service</a> and <a href="#" className="text-purple-600 hover:text-purple-500">Privacy Policy</a>
-                            </label>
                         </div>
 
                         <div>
