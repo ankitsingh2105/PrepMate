@@ -16,14 +16,16 @@ function CodeEditor() {
     const [input, setInput] = useState('');
     const [result, setResult] = useState('');
     const [error, setError] = useState('');
+    const [socketId, setSocketId] = useState("");
+    const yourSocketId = useRef(null);
 
     const toBase64 = (str) => window.btoa(unescape(encodeURIComponent(str)));
 
-    
+
     const handleEditorChange = (value) => {
         setSourceCode(value);
         lastSentCode.current = value;
-        socket.emit("user:codeChange", { room, sourceCode: value });
+        socket.emit("user:codeChange", { room, sourceCode: value, socketId });
     };
 
     const getResult = async () => {
@@ -48,10 +50,9 @@ function CodeEditor() {
                 }
             );
             token = response.data.token;
-            toast.info("Waiting for results",  {autoClose:200});
-        } 
+            toast.info("Waiting for results", { autoClose: 200 });
+        }
         catch (err) {
-            console.error(err);
             setError("Error submitting code");
             toast.error("Submission failed", { autoClose: 500 });
             return;
@@ -78,17 +79,17 @@ function CodeEditor() {
             setResult(decodedOutput);
             socket.emit("getOutput", { decodedOutput, room });
             setError('');
-            toast.success("Please check output", {autoClose:400});
-        } 
+            toast.success("Please check output", { autoClose: 400 });
+        }
         catch (err) {
             console.error(err);
             setError("Error fetching result");
         }
     };
 
-    const handleIncomingCode = (code) => {
-        if (code.sourceCode !== lastSentCode.current) {
-            setSourceCode(code.sourceCode);
+    const handleIncomingCode = (e) => {
+        if (e.sourceCode !== lastSentCode.current && socketId!=e.senderSocketId) {
+            setSourceCode(e.sourceCode);
         }
     };
 
@@ -99,6 +100,22 @@ function CodeEditor() {
     useEffect(() => {
         socket.emit("joinRoom", room);
     }, [socket]);
+
+
+    useEffect(() => {
+        socket.on("newUserJoin", (e) => {
+            if (!yourSocketId.current) {
+                setSocketId(e.newUserId);
+            }
+        });
+        return () => {
+            socket.off("newUserJoin"); 
+        };
+    }, [socket]);
+
+    useEffect(() => {
+        yourSocketId.current = socketId;
+    }, [socketId])
 
     useEffect(() => {
         socket.on("user:codeChangeAccepted", handleIncomingCode);

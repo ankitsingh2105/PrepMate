@@ -104,15 +104,18 @@ interviewNamespace.on("connection", (socket) => {
     console.log(`User ${socket.id} disconnected`);
   });
 });
-
+ 
 // Code Edit namespace
 codeEditNamespace.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
     socket.join(room);
+    socket.to(room).emit("newUserJoin", {newUserId : socket.id})
+    console.log("opo- > " , socket.id);
   });
 
-  socket.on("user:codeChange", ({ room, sourceCode }) => {
-    codeEditNamespace.to(room).emit("user:codeChangeAccepted", { sourceCode });
+  socket.on("user:codeChange", ({ room, sourceCode, socketId }) => {
+    console.log("op ankit:: " , socketId);
+    codeEditNamespace.to(room).emit("user:codeChangeAccepted", { sourceCode, senderSocketId : socketId });
   });
 
   socket.on("getOutput", ({ decodedOutput, room }) => {
