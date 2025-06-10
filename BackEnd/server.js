@@ -51,6 +51,8 @@ interviewNamespace.on("connection", (socket) => {
     const data = { email, socketID: socket.id };
     socket.join(room);
 
+    console.log(roomUsers);
+
     // Add user to roomUsers map
     if (!roomUsers.has(room)) {
       roomUsers.set(room, new Set());
@@ -71,27 +73,22 @@ interviewNamespace.on("connection", (socket) => {
   });
 
   socket.on("user:call", ({ sendername, to, offer }) => {
-    console.log(`user:call from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("incoming:call", { sendername, from: socket.id, offer });
   });
 
   socket.on("call:accepted", ({ to, ans }) => {
-    console.log(`call:accepted from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("call:accepted", { from: socket.id, ans });
   });
 
   socket.on("peer:nego:needed", ({ to, offer }) => {
-    console.log(`peer:nego:needed from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("peer:nego:needed", { from: socket.id, offer });
   });
 
   socket.on("peer:nego:done", ({ to, ans }) => {
-    console.log(`peer:nego:done from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("peer:nego:final", { from: socket.id, ans });
   });
 
   socket.on("ice:candidate", ({ to, candidate }) => {
-    console.log(`ice:candidate from ${socket.id} to ${to}`);
     interviewNamespace.to(to).emit("ice:candidate", { candidate });
   });
 
