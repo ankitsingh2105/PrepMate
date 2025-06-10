@@ -16,7 +16,6 @@ function CodeEditor() {
     const [input, setInput] = useState('');
     const [result, setResult] = useState('');
     const [error, setError] = useState('');
-    const [socketId, setSocketId] = useState("");
     const yourSocketId = useRef(null);
 
     const toBase64 = (str) => window.btoa(unescape(encodeURIComponent(str)));
@@ -25,7 +24,7 @@ function CodeEditor() {
     const handleEditorChange = (value) => {
         setSourceCode(value);
         lastSentCode.current = value;
-        socket.emit("user:codeChange", { room, sourceCode: value, socketId });
+        socket.emit("user:codeChange", { room, sourceCode: value, socketId :yourSocketId.current });
     };
 
     const getResult = async () => {
@@ -88,7 +87,8 @@ function CodeEditor() {
     };
 
     const handleIncomingCode = (e) => {
-        if (e.sourceCode !== lastSentCode.current && socketId!=e.senderSocketId) {
+        console.log(e.senderSocketId, " +++++ ", yourSocketId.current);
+        if (e.sourceCode !== lastSentCode.current && yourSocketId.current != e.senderSocketId) {
             setSourceCode(e.sourceCode);
         }
     };
@@ -98,24 +98,16 @@ function CodeEditor() {
     };
 
     useEffect(() => {
-        socket.emit("joinRoom", room);
-    }, [socket]);
-
-
-    useEffect(() => {
-        socket.on("newUserJoin", (e) => {
-            if (!yourSocketId.current) {
-                setSocketId(e.newUserId);
+        socket.on("connect", () => {
+            console.log("✅ I am connected, my id is:", socket.id);
+            if(!yourSocketId.current){
+                yourSocketId.current = socket.id;
+                console.log("shdjnsc:: " , yourSocketId.current);
             }
+            socket.emit("joinRoom", room); 
         });
-        return () => {
-            socket.off("newUserJoin"); 
-        };
     }, [socket]);
 
-    useEffect(() => {
-        yourSocketId.current = socketId;
-    }, [socketId])
 
     useEffect(() => {
         socket.on("user:codeChangeAccepted", handleIncomingCode);
