@@ -16,40 +16,22 @@ function CodeEditor() {
     const [input, setInput] = useState('');
     const [result, setResult] = useState('');
     const [error, setError] = useState('');
-    const [token, setToken] = useState('');
 
     const toBase64 = (str) => window.btoa(unescape(encodeURIComponent(str)));
 
-    function throttleFunction(func, delay) {
-        let throttle = false;
-        return function (...args) {
-            if (throttle) return;
-            throttle = true;
-            func(...args);
-            setTimeout(() => {
-                throttle = false;
-            }, delay);
-        }
-    }
-
-    function sendCodeChanges(room, value) {
-        socket.emit("user:codeChange", { room, sourceCode: value });
-    }
-
-    const throttleSendCode = throttleFunction(sendCodeChanges, 200);
-
+    
     const handleEditorChange = (value) => {
         setSourceCode(value);
         lastSentCode.current = value;
-        throttleSendCode(room, value);
+        socket.emit("user:codeChange", { room, sourceCode: value });
     };
 
-    const submitCode = async () => {
+    const getResult = async () => {
         const encodedSourceCode = toBase64(sourceCode);
         const encodedInput = input ? toBase64(input) : '';
-
+        let token;
         try {
-            const response = await axios.post(
+            let response = await axios.post(
                 'https://judge0-ce.p.rapidapi.com/submissions',
                 {
                     language_id: compilerID,
@@ -65,21 +47,18 @@ function CodeEditor() {
                     }
                 }
             );
-            setToken(response.data.token);
-            toast.success("Code submitted. Click on 'Get Result'.");
-        } catch (err) {
+            token = response.data.token;
+            toast.info("Waiting for results",  {autoClose:200});
+        } 
+        catch (err) {
             console.error(err);
             setError("Error submitting code");
-            toast.error("Submission failed");
-        }
-    };
-
-    const getResult = async () => {
-        if (!token) {
-            setError("No token available. Please submit the code first.");
+            toast.error("Submission failed", { autoClose: 500 });
             return;
         }
-
+        if (!token) {
+            return;
+        }
         try {
             const response = await axios.get(
                 `https://judge0-ce.p.rapidapi.com/submissions/${token}`,
@@ -93,13 +72,15 @@ function CodeEditor() {
             );
             const decodedOutput = atob(response.data.stdout || '');
             if (!decodedOutput.trim()) {
-                toast.error("Error in code");
+                toast.error("Syntax error / wrong language");
                 return;
             }
             setResult(decodedOutput);
             socket.emit("getOutput", { decodedOutput, room });
             setError('');
-        } catch (err) {
+            toast.success("Please check output", {autoClose:400});
+        } 
+        catch (err) {
             console.error(err);
             setError("Error fetching result");
         }
@@ -172,12 +153,6 @@ function CodeEditor() {
             />
 
             <div className="flex gap-4 mb-4">
-                <button
-                    className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition"
-                    onClick={submitCode}
-                >
-                    Submit
-                </button>
                 <button
                     className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-700 transition"
                     onClick={getResult}
