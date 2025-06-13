@@ -1,0 +1,40 @@
+| Name                         | 🧠 What it is                                   | ✅ Built-in? | 🔎 Notes                             |
+| ---------------------------  | ----------------------------------------------- | ----------- | ------------------------------------ |
+| **`RTCPeerConnection`**      | Main WebRTC API for P2P audio/video/data        | ✅ Yes       | Core WebRTC object                   |
+| **`RTCSessionDescription`**  | Represents offer/answer SDP (session info)      | ✅ Yes       | Used to describe connection metadata |
+| **`RTCIceCandidate`**        | Represents an ICE candidate (network path info) | ✅ Yes       | Helps NAT traversal between peers    |
+| **`iceServers` config**      | STUN server config to help find public IP       | ✅ Yes       | Passed to `RTCPeerConnection`        |
+| **`.onicecandidate`**        | Event fired when ICE candidates are discovered  | ✅ Yes       | You attach a listener to it          |
+| **`createOffer()`**          | Generates an SDP offer to start the connection  | ✅ Yes       | Async method of `RTCPeerConnection`  |
+| **`createAnswer()`**         | Generates SDP answer in response to offer       | ✅ Yes       | Used on receiving side               |
+| **`setLocalDescription()`**  | Sets this peer’s own session info               | ✅ Yes       | Required for signaling               |
+| **`setRemoteDescription()`** | Sets remote peer’s session info                 | ✅ Yes       | Required for signaling               |
+| **`addIceCandidate()`**      | Adds remote ICE candidates to connection        | ✅ Yes       | Called when receiving candidates     |
+| **`close()`**                | Terminates the current WebRTC connection        | ✅ Yes       | Cleanly tears down peer              |
+
+
+Establishes a WebRTC peer connection using public STUN servers.
+
+Handles ICE candidates discovery.
+
+Provides methods to:
+
+Generate an offer.
+
+Create an answer from an offer.
+
+Set remote descriptions.
+
+Add ICE candidates received from a signaling server.
+
+Can reset the connection (close and create a new one).
+
+
+| Step | Who    | What Happens                                          |
+| ---- | ------ | ----------------------------------------------------- |
+| 1    | User A | Joins → sends "ready" to server                       |
+| 2    | Server | Matches User A with User B                            |
+| 3    | User A | Calls `getOffer()` → sends offer via WebSocket        |
+| 4    | User B | Calls `getAnswer(offer)` → sends answer via WebSocket |
+| 5    | Both   | Exchange ICE candidates using `addIceCandidate()`     |
+| 6    | Both   | WebRTC establishes P2P connection                     |
