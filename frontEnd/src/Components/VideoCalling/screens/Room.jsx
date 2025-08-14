@@ -24,14 +24,23 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     const [otherUsername, setOtherUsername] = useState("");
     const [isAudioMuted, setIsAudioMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState("disconnected");
+    
     const tracksAddedRef = useRef(false);
     const pendingCallRef = useRef(null);
-    const isInitiatorRef = useRef(false); // Track if this client is the call initiator
+    const isInitiatorRef = useRef(false);
+    const remoteVideoRef = useRef(null);
+    const isMountedRef = useRef(true);
 
     const location = useLocation();
     const currentPageUrl = `https://prepmatee.vercel.app${location.pathname}`;
+    
     useEffect(() => {
         toast.info("Copy the link and send to a friend", { autoClose: 1500 });
+        
+        return () => {
+            isMountedRef.current = false;
+        };
     }, []);
 
     const userInfo = useSelector((state) => state.userInfo);
@@ -42,7 +51,11 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
-                video: true
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 30 }
+                }
             });
             console.log("Initialized stream:", {
                 audioTracks: stream.getAudioTracks().map(t => ({ enabled: t.enabled, label: t.label })),
@@ -52,20 +65,23 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             return stream;
         } catch (error) {
             console.error("Error accessing media devices:", error);
+            toast.error("Failed to access camera/microphone. Please check permissions.");
             return null;
         }
     }, []);
 
     const handleSubmit = useCallback(() => {
-        // const room = url.pathname.split("/")[2];
         const room = url.pathname.split("/")[3];
         if (userDetails && userDetails.email) {
+            console.log("Joining room:", room, "with email:", userDetails.email);
             const email = userDetails.email;
+            const name = userDetails.name;
             setLoading(true);
-            console.log("Joining room:", room, "with email:", email);
-            socket.emit("room:join", { email, room });
+            socket.emit("room:join", { email, room, name });
+            console.log("1. Room Join");
         } else {
             console.error("User details not available");
+            toast.error("User details not available");
         }
     }, [userDetails, socket, url]);
 
@@ -74,17 +90,13 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
 
         let isMounted = true;
         initializeStream().then((stream) => {
-            if (isMounted && stream) {
+            if (isMounted && stream && isMountedRef.current) {
                 handleSubmit();
             }
         });
 
         return () => {
             isMounted = false;
-            if (myStream) {
-                myStream.getTracks().forEach(track => track.stop());
-                console.log("Stopped myStream tracks");
-            }
         };
     }, [userDetails, initializeStream, handleSubmit]);
 
@@ -95,7 +107,6 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             audioTrack.enabled = !audioTrack.enabled;
             setIsAudioMuted(!audioTrack.enabled);
             toast.info(audioTrack.enabled ? "Microphone unmuted" : "Microphone muted", { autoClose: 500 });
-            console.log("Audio track toggled:", { enabled: audioTrack.enabled });
         }
     }, [myStream]);
 
@@ -106,21 +117,20 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             videoTrack.enabled = !videoTrack.enabled;
             setIsVideoOff(!videoTrack.enabled);
             toast.info(videoTrack.enabled ? "Video turned on" : "Video turned off", { autoClose: 500 });
-            console.log("Video track toggled:", { enabled: videoTrack.enabled });
         }
     }, [myStream]);
 
     const handleUserJoined = useCallback((data) => {
-        const { email, socketID } = data;
+        const { name, email, socketID } = data;
         if (socketID === socket.id) {
-            console.log("Ignoring self in user:joined");
             return;
         }
         console.log("New user joined:", data);
         setRemoteSocketId(socketID);
-        setOtherUsername(email);
-        isInitiatorRef.current = true; // This client will initiate the call
-        toast.info(`User ${email} joined the room`, { autoClose: 1500 });
+        setOtherUsername(name);
+        setConnectionStatus("connected");
+        isInitiatorRef.current = true;
+        toast.info(`User ${name} joined the room`, { autoClose: 1500 });
     }, [socket.id]);
 
     const sendStreams = useCallback(() => {
@@ -132,28 +142,38 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             console.warn("sendStreams: Tracks already added");
             return;
         }
-        const tracks = myStream.getTracks();
-        console.log("Adding tracks:", tracks.map(t => ({ kind: t.kind, enabled: t.enabled, label: t.label })));
-        for (const track of tracks) {
-            peer.webRTCPeer.addTrack(track, myStream);
+        
+        try {
+            const tracks = myStream.getTracks();
+            console.log("Adding tracks:", tracks.map(t => ({ kind: t.kind, enabled: t.enabled, label: t.label })));
+            
+            for (const track of tracks) {
+                peer.webRTCPeer.addTrack(track, myStream);
+            }
+            tracksAddedRef.current = true;
+            console.log("Streams sent successfully");
+        } catch (error) {
+            console.error("Error sending streams:", error);
+            tracksAddedRef.current = false;
         }
-        tracksAddedRef.current = true;
     }, [myStream]);
 
     const initiateCall = useCallback(async () => {
-        if (!myStream || !isInitiatorRef.current) {
-            console.error("initiateCall: Not initiator or no stream");
+        if (!myStream || !isInitiatorRef.current || !remoteSocketId) {
+            console.error("initiateCall: Not initiator or no stream or no remote user");
             return;
         }
+        
         console.log("Initiating call to", remoteSocketId);
         try {
-            const offer = await peer.getOffer();
-            console.log("Offer SDP:", offer.sdp);
+            const offer = await peer.makeOffer();
             const name = userDetails.name;
             socket.emit("user:call", { sendername: name, to: remoteSocketId, offer });
+            console.log("2. Calling");
             sendStreams();
         } catch (error) {
             console.error("Error initiating call:", error);
+            toast.error("Failed to initiate call");
         }
     }, [remoteSocketId, socket, userDetails, myStream, sendStreams]);
 
@@ -163,20 +183,24 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             pendingCallRef.current = { sendername, from, offer };
             return;
         }
+        
         setOtherUsername(sendername);
         setInComingCall(true);
         setRemoteSocketId(from);
-        console.log("Incoming call from", sendername, from, "Offer SDP:", offer.sdp);
-        toast.info(`Incoming call from ${sendername}`, { autoClose: 1000 });
+        setConnectionStatus("connected");
+        console.log("Incoming call from", sendername, from);
+        toast.info(`Incoming call from ${sendername}`, { autoClose: 500 });
+        
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(offer));
             const ans = await peer.getAnswer(offer);
             console.log("Answer SDP:", ans.sdp);
             socket.emit("call:accepted", { to: from, ans });
             sendStreams();
-            isInitiatorRef.current = false; // This client is not the initiator
+            isInitiatorRef.current = false;
         } catch (error) {
             console.error("Error accepting call:", error);
+            toast.error("Failed to accept call");
         }
     }, [socket, myStream, sendStreams]);
 
@@ -190,20 +214,21 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
     }, [myStream, handleIncomingCall]);
 
     const handleAcceptCall = useCallback(async ({ from, ans }) => {
-        console.log("Call accepted from", from, "Answer:", ans);
+        console.log("3. Call Accepted");
         try {
             await peer.setRemoteDescription(new RTCSessionDescription(ans));
             toast.success("Call accepted", { autoClose: 1500 });
         } catch (error) {
             console.error("Error accepting call:", error);
+            toast.error("Failed to accept call");
         }
     }, []);
 
     const handleNegoNeeded = useCallback(async () => {
         try {
-            const offer = await peer.getOffer();
+            const offer = await peer.makeOffer();
             socket.emit("peer:nego:needed", { to: remoteSocketId, offer });
-            console.log("Negotiation needed, offer sent to", remoteSocketId);
+            console.log("4. negotiating");
         } catch (error) {
             console.error("Error in negotiation:", error);
         }
@@ -221,56 +246,115 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
 
     const handleNegoFinal = useCallback(async ({ ans }) => {
         try {
-            await peer.setRemoteDescription(new RTCSessionDescription(ans));
-            console.log("Negotiation finalized");
+            const state = peer.webRTCPeer.signalingState;
+            console.log("Signaling state before applying answer:", state);
+
+            if (state === "have-local-offer") {
+                await peer.setRemoteDescription(new RTCSessionDescription(ans));
+                console.log("Negotiation finalized");
+            } else {
+                console.warn("Skipped applying answer. Unexpected signaling state:", state);
+            }
         } catch (error) {
             console.error("Error in negotiation final:", error);
         }
     }, []);
 
-    useEffect(() => {
-        peer.webRTCPeer.addEventListener("negotiationneeded", handleNegoNeeded);
-        return () => {
-            peer.webRTCPeer.removeEventListener("negotiationneeded", handleNegoNeeded);
-        };
-    }, [handleNegoNeeded]);
-
-    useEffect(() => {
-        peer.webRTCPeer.addEventListener("track", async (e) => {
-            const remoteStreams = e.streams;
-            console.log("Received remote streams:", remoteStreams);
-            if (remoteStreams && remoteStreams[0]) {
-                setRemoteStream(remoteStreams[0]);
-            } else {
-                console.warn("No remote stream received");
-            }
-        });
-
-        peer.webRTCPeer.addEventListener("connectionstatechange", () => {
-            console.log("Connection state:", peer.webRTCPeer.connectionState);
-            if (peer.webRTCPeer.connectionState === "failed") {
-                peer.resetConnection();
-                tracksAddedRef.current = false;
-            }
-        });
-
-        return () => {
-            peer.webRTCPeer.removeEventListener("track", () => {});
-            peer.webRTCPeer.removeEventListener("connectionstatechange", () => {});
-        };
+    // Handle connection state changes
+    const handleConnectionStateChange = useCallback((state) => {
+        console.log("Connection state changed to:", state);
+        if (state === 'connected') {
+            setConnectionStatus("connected");
+            toast.success("Call connected!", { autoClose: 1000 });
+        } else if (state === 'failed' || state === 'disconnected') {
+            setConnectionStatus("disconnected");
+            toast.error("Call disconnected", { autoClose: 2000 });
+            // Reset connection after a delay
+            setTimeout(() => {
+                if (isMountedRef.current) {
+                    peer.resetConnection();
+                    tracksAddedRef.current = false;
+                }
+            }, 2000);
+        } else if (state === 'connecting') {
+            setConnectionStatus("connecting");
+        }
     }, []);
 
-    useEffect(() => {
-        if (!peer) {
-            console.error("Peer service is not available");
-            return;
+    // Handle incoming tracks
+    const handleTrack = useCallback((event) => {
+        console.log("Track received:", event);
+        const remoteStreams = event.streams;
+        if (remoteStreams && remoteStreams[0]) {
+            console.log("Setting remote stream:", remoteStreams[0]);
+            setRemoteStream(remoteStreams[0]);
+            
+            // Ensure video element is properly set up
+            if (remoteVideoRef.current) {
+                remoteVideoRef.current.srcObject = remoteStreams[0];
+                remoteVideoRef.current.play().catch(e => {
+                    console.error("Error playing remote video:", e);
+                });
+            }
+        } else {
+            console.warn("No remote stream received");
         }
+    }, []);
+
+    // Retry connection if it fails
+    const retryConnection = useCallback(() => {
+        if (!isMountedRef.current) return;
+        
+        console.log("Retrying connection...");
+        setConnectionStatus("connecting");
+        
+        // Reset peer connection
+        peer.resetConnection();
+        tracksAddedRef.current = false;
+        
+        // Re-initialize if we have a remote user
+        if (remoteSocketId && myStream) {
+            setTimeout(() => {
+                if (isMountedRef.current) {
+                    initiateCall();
+                }
+            }, 2000);
+        }
+    }, [remoteSocketId, myStream, initiateCall]);
+
+    // Handle connection errors
+    const handleConnectionError = useCallback((error) => {
+        console.error("Connection error:", error);
+        setConnectionStatus("error");
+        toast.error("Connection failed. Click to retry.", {
+            autoClose: 5000,
+            onClick: retryConnection
+        });
+    }, [retryConnection]);
+
+    useEffect(() => {
+        if (!peer) return;
+
+        // Set up peer event handlers
+        peer.setOnConnectionStateChange(handleConnectionStateChange);
+        peer.setOnTrack(handleTrack);
         peer.setOnIceCandidate((candidate) => {
             if (remoteSocketId) {
-                console.log("Emitting ICE candidate to", remoteSocketId);
                 socket.emit("ice:candidate", { to: remoteSocketId, candidate });
             }
         });
+        peer.setOnIceError(handleConnectionError);
+
+        return () => {
+            peer.setOnConnectionStateChange(null);
+            peer.setOnTrack(null);
+            peer.setOnIceCandidate(null);
+            peer.setOnIceError(null);
+        };
+    }, [handleConnectionStateChange, handleTrack, handleConnectionError, remoteSocketId, socket, peer]);
+
+    useEffect(() => {
+        if (!peer) return;
 
         socket.on("user:joined", handleUserJoined);
         socket.on("incoming:call", handleIncomingCall);
@@ -278,23 +362,35 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
         socket.on("peer:nego:needed", handleNegoNeededIncoming);
         socket.on("peer:nego:final", handleNegoFinal);
         socket.on("ice:candidate", async ({ candidate }) => {
-            console.log("Received ICE candidate:", candidate);
             try {
                 await peer.addIceCandidate(candidate);
             } catch (error) {
                 console.error("Error adding ICE candidate:", error);
             }
         });
+        
         socket.on("user:left", ({ socketID }) => {
             if (socketID === remoteSocketId) {
                 console.log("User left:", socketID);
                 setRemoteSocketId("");
                 setRemoteStream(null);
                 setOtherUsername("");
+                setConnectionStatus("disconnected");
                 tracksAddedRef.current = false;
                 peer.resetConnection();
                 toast.info("User left the room", { autoClose: 1500 });
             }
+        });
+
+        // Handle heartbeat
+        socket.on("heartbeat", () => {
+            socket.emit("heartbeat:ack");
+        });
+
+        // Handle room full
+        socket.on("room:full", ({ message }) => {
+            toast.error(message);
+            setConnectionStatus("error");
         });
 
         return () => {
@@ -305,13 +401,21 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
             socket.off("peer:nego:final", handleNegoFinal);
             socket.off("ice:candidate");
             socket.off("user:left");
+            socket.off("heartbeat");
+            socket.off("room:full");
         };
     }, [socket, handleUserJoined, handleIncomingCall, handleAcceptCall, handleNegoNeededIncoming, handleNegoFinal, remoteSocketId]);
 
     useEffect(() => {
         if (remoteSocketId && myStream && remoteSocketId !== socket.id && isInitiatorRef.current) {
-            console.log("Triggering initiateCall for remoteSocketId:", remoteSocketId);
-            initiateCall();
+            // Add a small delay to ensure everything is ready
+            const timer = setTimeout(() => {
+                if (isMountedRef.current) {
+                    initiateCall();
+                }
+            }, 1000);
+            
+            return () => clearTimeout(timer);
         }
     }, [remoteSocketId, myStream, initiateCall, socket.id]);
 
@@ -324,6 +428,58 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                 console.error('Failed to copy text:', error);
             });
     };
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (myStream) {
+                myStream.getTracks().forEach(track => track.stop());
+                console.log("Stopped myStream tracks");
+            }
+            if (remoteStream) {
+                remoteStream.getTracks().forEach(track => track.stop());
+                console.log("Stopped remoteStream tracks");
+            }
+            peer.resetConnection();
+            
+            // Notify server that we're leaving
+            if (socket && remoteSocketId) {
+                socket.emit("room:leave");
+            }
+        };
+    }, [myStream, remoteStream, socket, remoteSocketId]);
+
+    // Handle page refresh/visibility change
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            if (socket && remoteSocketId) {
+                socket.emit("room:leave");
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden && socket && remoteSocketId) {
+                // Page is hidden (user switched tabs or minimized)
+                console.log("Page hidden, notifying server");
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [socket, remoteSocketId]);
+
+    // Update remote video when stream changes
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+            console.log("✅ Remote video stream attached:", remoteStream);
+        }
+    }, [remoteStream]);
 
     return (
         <div className="w-full text-center">
@@ -347,16 +503,29 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                     </div>
 
                     <div className="mb-4">
-                        {otherUsername && remoteSocketId ? (
-                            <div className="bg-green-500 text-white px-4 py-1 rounded-full inline-flex items-center">
-                                <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
-                                <span className="font-medium">Connected</span>
-                            </div>
-                        ) : (
-                            <div className="bg-red-500 text-white px-4 py-1 rounded-full inline-flex items-center">
-                                <div className="w-2 h-2 bg-white rounded-full mr-2"></div>
-                                <span className="font-medium">Disconnected</span>
-                            </div>
+                        <div className={`px-4 py-1 rounded-full inline-flex items-center ${
+                            connectionStatus === "connected" 
+                                ? "bg-green-500 text-white" 
+                                : connectionStatus === "connecting"
+                                ? "bg-yellow-500 text-white"
+                                : connectionStatus === "error"
+                                ? "bg-red-600 text-white"
+                                : "bg-red-500 text-white"
+                        }`}>
+                            <div className={`w-2 h-2 rounded-full mr-2 ${
+                                connectionStatus === "connected" ? "animate-pulse" : 
+                                connectionStatus === "connecting" ? "animate-spin" : ""
+                            }`}></div>
+                            <span className="font-medium capitalize">{connectionStatus}</span>
+                        </div>
+                        
+                        {connectionStatus === "error" && (
+                            <button 
+                                onClick={retryConnection}
+                                className="mt-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                            >
+                                Retry Connection
+                            </button>
                         )}
                     </div>
 
@@ -396,13 +565,15 @@ export default function Room({ windowWidth, roomWidth = 640, roomHeight = 360, d
                         <div className="relative">
                             {remoteStream ? (
                                 <div className="rounded-xl overflow-hidden shadow-lg border-2 border-purple-200">
-                                    <ReactPlayer
+                                    <video
                                         width={roomWidth}
                                         height={roomHeight}
-                                        url={remoteStream}
-                                        playing={true}
+                                        autoPlay
+                                        playsInline
                                         muted={false}
-                                        onError={(e) => console.error("Remote ReactPlayer error:", e)}
+                                        ref={remoteVideoRef}
+                                        onError={(e) => console.error("Remote video error:", e)}
+                                        style={{ backgroundColor: '#000' }}
                                     />
                                     <div className="absolute bottom-0 left-0 right-0 bg-purple-600 bg-opacity-100 text-white py-1 px-3 text-sm font-semibold">
                                         {otherUsername || 'Participant'}
