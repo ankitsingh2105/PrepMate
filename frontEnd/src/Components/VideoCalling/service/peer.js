@@ -1,20 +1,30 @@
+import 'webrtc-adapter';
+
 class PeerService {
     constructor() {
-        this.createConnection();
+        // Initialize properties first
         this.onIceCandidate = null;
         this.onConnectionStateChange = null;
         this.onTrack = null;
         this.onIceError = null;
+        this.onIceConnectionStateChange = null;
+        this.onSignalingStateChange = null;
 
-        // 🧠 Track if remote description has been set
-        this.remoteDescriptionSet = false;
-
-        // ⏳ Store ICE candidates that arrive early
-        this.pendingCandidates = [];
-
-        // 🔄 Track connection attempts
+        // Track connection state
+        this.isConnected = false;
         this.connectionAttempts = 0;
         this.maxConnectionAttempts = 3;
+        
+        // ICE candidate handling
+        this.pendingCandidates = [];
+        this.remoteDescriptionSet = false;
+        
+        // Track management - initialize these before calling createConnection
+        this.localTracks = new Set();
+        this.remoteTracks = new Set();
+        
+        // Now create the connection
+        this.createConnection();
     }
 
     createConnection() {
@@ -23,6 +33,7 @@ class PeerService {
             this.webRTCPeer.close();
         }
 
+        // Create new RTCPeerConnection with better configuration
         this.webRTCPeer = new RTCPeerConnection({
             iceServers: [
                 {
@@ -34,7 +45,7 @@ class PeerService {
                         "stun:stun4.l.google.com:19302",
                     ],
                 },
-                // Add TURN servers for better connectivity
+                // TURN servers for better connectivity
                 {
                     urls: [
                         "turn:openrelay.meter.ca:80",
@@ -47,8 +58,24 @@ class PeerService {
             ],
             iceCandidatePoolSize: 10,
             bundlePolicy: 'max-bundle',
-            rtcpMuxPolicy: 'require'
+            rtcpMuxPolicy: 'require',
+            iceTransportPolicy: 'all',
+            sdpSemantics: 'unified-plan'
         });
+
+        // Set up event handlers
+        this.setupEventHandlers();
+        
+        // Reset flags
+        this.remoteDescriptionSet = false;
+        this.pendingCandidates = [];
+        this.isConnected = false;
+        this.localTracks.clear();
+        this.remoteTracks.clear();
+    }
+
+    setupEventHandlers() {
+        if (!this.webRTCPeer) return;
 
         this.webRTCPeer.onicecandidate = (event) => {
             if (event.candidate) {
@@ -58,12 +85,16 @@ class PeerService {
         };
 
         this.webRTCPeer.onconnectionstatechange = () => {
-            console.log("Connection state changed:", this.webRTCPeer.connectionState);
-            this.onConnectionStateChange?.(this.webRTCPeer.connectionState);
+            const state = this.webRTCPeer.connectionState;
+            console.log("Connection state changed:", state);
+            this.isConnected = state === 'connected';
+            this.onConnectionStateChange?.(state);
         };
 
         this.webRTCPeer.oniceconnectionstatechange = () => {
-            console.log("ICE connection state:", this.webRTCPeer.iceConnectionState);
+            const state = this.webRTCPeer.iceConnectionState;
+            console.log("ICE connection state:", state);
+            this.onIceConnectionStateChange?.(state);
         };
 
         this.webRTCPeer.onicegatheringstatechange = () => {
@@ -71,12 +102,20 @@ class PeerService {
         };
 
         this.webRTCPeer.onsignalingstatechange = () => {
-            console.log("Signaling state:", this.webRTCPeer.signalingState);
+            const state = this.webRTCPeer.signalingState;
+            console.log("Signaling state:", state);
+            this.onSignalingStateChange?.(state);
         };
 
-        // Reset flags
-        this.remoteDescriptionSet = false;
-        this.pendingCandidates = [];
+        this.webRTCPeer.ontrack = (event) => {
+            console.log("Track received:", event);
+            this.onTrack?.(event);
+        };
+
+        this.webRTCPeer.onicecandidateerror = (event) => {
+            console.error("ICE candidate error:", event);
+            this.onIceError?.(event);
+        };
     }
 
     setOnIceCandidate(callback) {
@@ -89,28 +128,75 @@ class PeerService {
 
     setOnTrack(callback) {
         this.onTrack = callback;
-        if (this.webRTCPeer) {
-            this.webRTCPeer.ontrack = callback;
-        }
     }
 
     setOnIceError(callback) {
         this.onIceError = callback;
-        if (this.webRTCPeer) {
-            this.webRTCPeer.onicecandidateerror = (event) => {
-                console.error("ICE candidate error:", event);
-                this.onIceError?.(event);
-            };
+    }
+
+    setOnIceConnectionStateChange(callback) {
+        this.onIceConnectionStateChange = callback;
+    }
+
+    setOnSignalingStateChange(callback) {
+        this.onSignalingStateChange = callback;
+    }
+
+    // Add local tracks to the peer connection
+    addLocalTracks(stream) {
+        if (!this.webRTCPeer || !stream) return;
+
+        try {
+            const tracks = stream.getTracks();
+            console.log("Adding local tracks:", tracks.map(t => ({ kind: t.kind, enabled: t.enabled })));
+            
+            for (const track of tracks) {
+                this.webRTCPeer.addTrack(track, stream);
+                this.localTracks.add(track);
+                console.log(`Added ${track.kind} track:`, track.label);
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Error adding local tracks:", error);
+            return false;
         }
+    }
+
+    // Remove local tracks
+    removeLocalTracks() {
+        if (!this.webRTCPeer) return;
+
+        this.localTracks.forEach(track => {
+            try {
+                const senders = this.webRTCPeer.getSenders();
+                const sender = senders.find(s => s.track === track);
+                if (sender) {
+                    this.webRTCPeer.removeTrack(sender);
+                    console.log(`Removed ${track.kind} track`);
+                }
+            } catch (error) {
+                console.error("Error removing track:", error);
+            }
+        });
+
+        this.localTracks.clear();
     }
 
     async makeOffer() {
         try {
             console.log("Creating offer...");
+            
+            // Ensure we have tracks before creating offer
+            if (this.localTracks.size === 0) {
+                throw new Error("No local tracks available for offer");
+            }
+
             const offer = await this.webRTCPeer.createOffer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true
             });
+
             await this.webRTCPeer.setLocalDescription(offer);
             console.log("Offer created and set as local description");
             return offer;
@@ -125,27 +211,32 @@ class PeerService {
             console.log("Setting remote description from offer...");
             await this.webRTCPeer.setRemoteDescription(new RTCSessionDescription(offer));
             this.remoteDescriptionSet = true;
+            
+            // Flush any pending ICE candidates
             await this.flushPendingCandidates();
             
             console.log("Creating answer...");
-            const ans = await this.webRTCPeer.createAnswer({
+            const answer = await this.webRTCPeer.createAnswer({
                 offerToReceiveAudio: true,
                 offerToReceiveVideo: true
             });
-            await this.webRTCPeer.setLocalDescription(ans);
+
+            await this.webRTCPeer.setLocalDescription(answer);
             console.log("Answer created and set as local description");
-            return ans;
+            return answer;
         } catch (error) {
             console.error("Error creating answer:", error);
             throw error;
         }
     }
 
-    async setRemoteDescription(ans) {
+    async setRemoteDescription(description) {
         try {
-            console.log("Setting remote description from answer...");
-            await this.webRTCPeer.setRemoteDescription(new RTCSessionDescription(ans));
+            console.log("Setting remote description:", description.type);
+            await this.webRTCPeer.setRemoteDescription(new RTCSessionDescription(description));
             this.remoteDescriptionSet = true;
+            
+            // Flush any pending ICE candidates
             await this.flushPendingCandidates();
             console.log("Remote description set successfully");
         } catch (error) {
@@ -160,7 +251,7 @@ class PeerService {
                 await this.webRTCPeer.addIceCandidate(new RTCIceCandidate(candidate));
                 console.log("ICE candidate added successfully");
             } else {
-                console.log("Queuing ICE candidate (remoteDescription not set yet):", candidate);
+                console.log("Queuing ICE candidate (remote description not set yet)");
                 this.pendingCandidates.push(candidate);
             }
         } catch (error) {
@@ -173,6 +264,7 @@ class PeerService {
         if (this.pendingCandidates.length === 0) return;
         
         console.log(`Flushing ${this.pendingCandidates.length} pending ICE candidates`);
+        
         for (const candidate of this.pendingCandidates) {
             try {
                 await this.webRTCPeer.addIceCandidate(new RTCIceCandidate(candidate));
@@ -181,28 +273,44 @@ class PeerService {
                 console.error("Error adding queued ICE candidate:", err);
             }
         }
+        
         this.pendingCandidates = [];
     }
 
+    // Reset the entire connection
     resetConnection() {
         console.log("Resetting WebRTC connection...");
+        
+        // Stop all local tracks
+        this.localTracks.forEach(track => {
+            track.stop();
+        });
+        
+        // Close the peer connection
         if (this.webRTCPeer) {
             this.webRTCPeer.close();
         }
+        
+        // Reset all state
         this.remoteDescriptionSet = false;
         this.pendingCandidates = [];
         this.connectionAttempts = 0;
+        this.isConnected = false;
+        this.localTracks.clear();
+        this.remoteTracks.clear();
+        
+        // Create new connection
         this.createConnection();
     }
 
-    // Add method to check if connection is healthy
+    // Check if connection is healthy
     isConnectionHealthy() {
         return this.webRTCPeer && 
                this.webRTCPeer.connectionState === 'connected' &&
                this.webRTCPeer.iceConnectionState === 'connected';
     }
 
-    // Add method to get connection stats
+    // Get connection statistics
     getConnectionStats() {
         if (!this.webRTCPeer) return null;
         
@@ -210,7 +318,20 @@ class PeerService {
             connectionState: this.webRTCPeer.connectionState,
             iceConnectionState: this.webRTCPeer.iceConnectionState,
             signalingState: this.webRTCPeer.signalingState,
-            iceGatheringState: this.webRTCPeer.iceGatheringState
+            iceGatheringState: this.webRTCPeer.iceGatheringState,
+            localTracks: this.localTracks.size,
+            remoteTracks: this.remoteTracks.size
+        };
+    }
+
+    // Get ICE candidates info
+    getIceCandidatesInfo() {
+        if (!this.webRTCPeer) return null;
+        
+        return {
+            iceGatheringState: this.webRTCPeer.iceGatheringState,
+            pendingCandidates: this.pendingCandidates.length,
+            remoteDescriptionSet: this.remoteDescriptionSet
         };
     }
 }

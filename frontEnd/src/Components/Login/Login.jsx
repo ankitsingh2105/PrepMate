@@ -43,7 +43,7 @@ const Login = () => {
 
     return (
         <div className="flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50 px-4 sm:px-6 lg:px-8">
-            <ToastContainer position="top-right" autoClose={3000} />
+            <ToastContainer position="bottom-right" autoClose={3000} />
             
             <div className="max-w-md w-full space-y-8">
                 <div className="text-center">

@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "start:https": "node https-server.js",
+    "generate-certs": "node generate-certs.js"
   },
   "author": "",
   "license": "ISC",
@@ -20,5 +23,8 @@
     "nodemon": "^3.1.7",
     "react-hot-toast": "^2.5.2",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "mkcert": "^1.4.4"
   }
 }
