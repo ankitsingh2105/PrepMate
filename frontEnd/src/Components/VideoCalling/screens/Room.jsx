@@ -32,7 +32,6 @@ export default function Room({
   const myVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const isMountedRef = useRef(true);
-  const connectionCheckInterval = useRef(null);
 
   const location = useLocation();
   const currentPageUrl = window.location.href;
@@ -159,7 +158,7 @@ export default function Room({
       setConnectionStatus("connected");
       isInitiatorRef.current = true;
       toast.success(`User ${name} joined the room`, { autoClose: 1500 });
-      setShowStartCallButton(true); // Show manual call button as fallback
+      setShowStartCallButton(true);
     },
     [socket.id]
   );
@@ -178,7 +177,7 @@ export default function Room({
         peer.webRTCPeer.addTrack(track, myStream);
       }
       tracksAddedRef.current = true;
-      console.log("✅ Local tracks added");
+      console.log("✅ Local tracks added:", myStream.getTracks());
       return true;
     } catch (error) {
       console.error("❌ Error adding local tracks:", error);
@@ -311,7 +310,7 @@ export default function Room({
       tracksAddedRef.current = false;
       setShowStartCallButton(!!remoteSocketId);
     }
-  }, []);
+  }, [remoteSocketId]);
 
   const handleTrack = useCallback(
     (event) => {
@@ -350,9 +349,10 @@ export default function Room({
     peer.webRTCPeer.onconnectionstatechange = () =>
       handleConnectionStateChange(peer.webRTCPeer.connectionState);
     peer.webRTCPeer.oniceconnectionstatechange = () => {
-      console.log("🧊 ICE connection state:", peer.webRTCPeer.iceConnectionState);
+      const iceState = peer.webRTCPeer.iceConnectionState;
+      console.log("🧊 ICE connection state:", iceState);
       setConnectionStats({
-        iceConnectionState: peer.webRTCPeer.iceConnectionState,
+        iceConnectionState: iceState,
         signalingState: peer.webRTCPeer.signalingState,
         localTracks: myStream ? myStream.getTracks().length : 0,
         remoteTracks: remoteStream ? remoteStream.getTracks().length : 0,
@@ -370,7 +370,7 @@ export default function Room({
     socket.on("connect", () => console.log("✅ Socket connected:", socket.id));
     socket.on("connect_error", (error) => {
       console.error("❌ Socket connection error:", error);
-      toast.error("Failed to connect to server. Check backend URL.");
+      toast.error("Failed to connect to server. Check backend URL and network.");
       setLoading(false);
     });
     socket.on("user:joined", handleUserJoined);
@@ -456,8 +456,10 @@ export default function Room({
     });
   };
 
+  // Cleanup only on component unmount
   useEffect(() => {
     return () => {
+      if (isMountedRef.current) return; // Prevent cleanup during re-renders
       if (myStream) {
         myStream.getTracks().forEach((track) => track.stop());
         console.log("🛑 Stopped local stream tracks");
@@ -469,9 +471,6 @@ export default function Room({
       peer.resetConnection();
       if (socket && remoteSocketId) {
         socket.emit("room:leave");
-      }
-      if (connectionCheckInterval.current) {
-        clearInterval(connectionCheckInterval.current);
       }
     };
   }, [myStream, remoteStream, socket, remoteSocketId]);
@@ -569,7 +568,7 @@ export default function Room({
                       className={`p-1 rounded-full ${isAudioMuted ? "bg-red-500" : "bg-green-500"} text-white hover:bg-opacity-80 transition-colors`}
                       aria-label={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
                     >
-                      {isAudioMuted ? <MicOff size={20} /> : <Mic size={20}/>}
+                      {isAudioMuted ? <MicOff size={20} /> : <Mic size={20} />}
                     </button>
                     <button
                       onClick={handleToggleVideo}
