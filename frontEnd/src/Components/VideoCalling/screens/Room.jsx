@@ -24,6 +24,7 @@ export default function Room({
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [connectionStats, setConnectionStats] = useState(null);
+  const [showStartCallButton, setShowStartCallButton] = useState(false);
 
   const tracksAddedRef = useRef(false);
   const pendingCallRef = useRef(null);
@@ -34,7 +35,7 @@ export default function Room({
   const connectionCheckInterval = useRef(null);
 
   const location = useLocation();
-  const currentPageUrl = window.location.href; // Use full URL for sharing
+  const currentPageUrl = window.location.href;
   const roomId = window.location.pathname.split("/").filter(Boolean).pop() || "";
 
   const userInfo = useSelector((state) => state.userInfo);
@@ -78,8 +79,14 @@ export default function Room({
       }
       return stream;
     } catch (error) {
-      console.error("❌ Error accessing media devices:", error);
-      toast.error("Failed to access camera/microphone. Ensure HTTPS and check permissions.");
+      console.error("❌ Error accessing media devices:", error.name, error.message);
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        toast.error("Camera/microphone permissions denied. Please grant access in browser settings and reload.");
+      } else if (error.name === "NotFoundError") {
+        toast.error("No camera/microphone found. Check your devices.");
+      } else {
+        toast.error("Failed to access camera/microphone. Check browser console for details.");
+      }
       setLoading(false);
       return null;
     }
@@ -114,6 +121,8 @@ export default function Room({
     initializeStream().then((stream) => {
       if (isMountedRef.current && stream) {
         handleSubmit();
+      } else {
+        setLoading(false);
       }
     });
   }, [userDetails, initializeStream, handleSubmit]);
@@ -150,6 +159,7 @@ export default function Room({
       setConnectionStatus("connected");
       isInitiatorRef.current = true;
       toast.success(`User ${name} joined the room`, { autoClose: 1500 });
+      setShowStartCallButton(true); // Show manual call button as fallback
     },
     [socket.id]
   );
@@ -184,6 +194,7 @@ export default function Room({
         isInitiator: isInitiatorRef.current,
         remoteSocketId,
       });
+      toast.error("Cannot start call. Ensure a user has joined and camera is active.");
       return;
     }
     console.log("📞 Initiating call to", remoteSocketId);
@@ -294,9 +305,11 @@ export default function Room({
     setConnectionStatus(state);
     if (state === "connected") {
       toast.success("🎉 Call connected!", { autoClose: 2000 });
+      setShowStartCallButton(false);
     } else if (state === "failed" || state === "disconnected") {
       toast.error("❌ Call disconnected", { autoClose: 3000 });
       tracksAddedRef.current = false;
+      setShowStartCallButton(!!remoteSocketId);
     }
   }, []);
 
@@ -336,14 +349,30 @@ export default function Room({
     peer.webRTCPeer.onnegotiationneeded = handleNegoNeeded;
     peer.webRTCPeer.onconnectionstatechange = () =>
       handleConnectionStateChange(peer.webRTCPeer.connectionState);
+    peer.webRTCPeer.oniceconnectionstatechange = () => {
+      console.log("🧊 ICE connection state:", peer.webRTCPeer.iceConnectionState);
+      setConnectionStats({
+        iceConnectionState: peer.webRTCPeer.iceConnectionState,
+        signalingState: peer.webRTCPeer.signalingState,
+        localTracks: myStream ? myStream.getTracks().length : 0,
+        remoteTracks: remoteStream ? remoteStream.getTracks().length : 0,
+      });
+    };
     return () => {
       peer.webRTCPeer.ontrack = null;
       peer.webRTCPeer.onnegotiationneeded = null;
       peer.webRTCPeer.onconnectionstatechange = null;
+      peer.webRTCPeer.oniceconnectionstatechange = null;
     };
-  }, [handleTrack, handleNegoNeeded, handleConnectionStateChange]);
+  }, [handleTrack, handleNegoNeeded, handleConnectionStateChange, myStream, remoteStream]);
 
   useEffect(() => {
+    socket.on("connect", () => console.log("✅ Socket connected:", socket.id));
+    socket.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error);
+      toast.error("Failed to connect to server. Check backend URL.");
+      setLoading(false);
+    });
     socket.on("user:joined", handleUserJoined);
     socket.on("incoming:call", handleIncomingCall);
     socket.on("call:accepted", handleAcceptCall);
@@ -375,6 +404,8 @@ export default function Room({
     });
 
     return () => {
+      socket.off("connect");
+      socket.off("connect_error");
       socket.off("user:joined");
       socket.off("incoming:call");
       socket.off("call:accepted");
@@ -405,6 +436,17 @@ export default function Room({
     }
   }, [remoteSocketId, myStream, initiateCall]);
 
+  useEffect(() => {
+    if (remoteSocketId && connectionStatus === "disconnected") {
+      const timer = setTimeout(() => {
+        if (isMountedRef.current && connectionStatus === "disconnected") {
+          setShowStartCallButton(true);
+        }
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [remoteSocketId, connectionStatus]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(currentPageUrl).then(() => {
       toast.success("📋 Invite link copied!", { autoClose: 1500 });
@@ -427,6 +469,9 @@ export default function Room({
       peer.resetConnection();
       if (socket && remoteSocketId) {
         socket.emit("room:leave");
+      }
+      if (connectionCheckInterval.current) {
+        clearInterval(connectionCheckInterval.current);
       }
     };
   }, [myStream, remoteStream, socket, remoteSocketId]);
@@ -484,7 +529,24 @@ export default function Room({
                 Retry Connection
               </button>
             )}
+            {showStartCallButton && (
+              <button
+                onClick={initiateCall}
+                className="mt-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm flex items-center mx-auto"
+              >
+                <Video className="w-4 h-4 mr-1" />
+                Start Call
+              </button>
+            )}
           </div>
+
+          {connectionStats && (
+            <div className="mb-4 text-xs text-gray-600 bg-gray-100 px-3 py-2 rounded">
+              <div>ICE: {connectionStats.iceConnectionState}</div>
+              <div>Signaling: {connectionStats.signalingState}</div>
+              <div>Tracks: {connectionStats.localTracks} local, {connectionStats.remoteTracks} remote</div>
+            </div>
+          )}
 
           <main className={`flex items-center justify-center ${direction === "column" ? "flex-col" : "flex-row"} gap-4`}>
             {myStream ? (
@@ -507,7 +569,7 @@ export default function Room({
                       className={`p-1 rounded-full ${isAudioMuted ? "bg-red-500" : "bg-green-500"} text-white hover:bg-opacity-80 transition-colors`}
                       aria-label={isAudioMuted ? "Unmute microphone" : "Mute microphone"}
                     >
-                      {isAudioMuted ? <MicOff size={20} /> : <Mic size={20} />}
+                      {isAudioMuted ? <MicOff size={20} /> : <Mic size={20}/>}
                     </button>
                     <button
                       onClick={handleToggleVideo}
