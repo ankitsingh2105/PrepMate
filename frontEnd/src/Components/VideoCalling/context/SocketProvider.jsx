@@ -13,10 +13,10 @@ export const useSocketforCode = () => {
     const socketForCode = useContext(SocketContextForChat);
     return socketForCode;
 }
-// http://192.168.0.118:5173/
 
 export default function SocketProvider(props) {
     const { backEndLink } = connectJs;
+    console.log(backEndLink);
     const socket = useMemo(() => io(`${backEndLink}/interview`, {
         withCredentials: true,
         transports: ["websocket", "polling"]
