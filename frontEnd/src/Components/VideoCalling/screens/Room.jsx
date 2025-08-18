@@ -3,8 +3,9 @@ import { useSocket } from "../context/SocketProvider";
 import PeerService from "../service/peer";
 import { useSelector } from "react-redux";
 import { useLocation } from 'react-router-dom';
+import { toast, ToastContainer } from "react-toastify"
 
-const Room = ({}) => {
+const Room = ({ }) => {
   const myVideoRef = useRef();
   const otherVideoRef = useRef();
   const socket = useSocket();
@@ -14,6 +15,9 @@ const Room = ({}) => {
   const { userDetails } = userInfo;
   const { name, email } = userDetails || {};
   const room = url.pathname.split("/")[3];
+  console.log(url);
+  const { roomWidth, roomHeight, direction } = url.state || {};
+  console.log(roomWidth, roomHeight, direction);
 
   useEffect(() => {
     const init = async () => {
@@ -111,7 +115,6 @@ const Room = ({}) => {
     }
 
     pc.ontrack = event => {
-      console.log("Remote stream received:", event.streams[0]);
       otherVideoRef.current.srcObject = event.streams[0];
     };
 
@@ -136,13 +139,61 @@ const Room = ({}) => {
   };
 
   return (
-    <div>
-      <h3>{joined ? `Joined room: ${room}` : "Connecting..."}</h3>
-      <video ref={myVideoRef} autoPlay playsInline muted style={{ width: "300px" }} />
-      <br />
-      <hr />
-      <video ref={otherVideoRef} autoPlay playsInline style={{ width: "300px" }} />
-    </div>
+    <center>
+      <ToastContainer />
+      <center className="text-lg">{joined ? <b className="text-green-500">Live Now</b> : <b className="text-red-500">Connecting...</b>}</center>
+      <section>Share this link to other users</section>
+      <small className="flex items-center justify-center space-x-2">
+        {/* URL display box */}
+        <section className="p-3 bg-gray-200 rounded-md">
+          {window.location.href}
+        </section>
+
+        {/* Copy button */}
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
+          onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success("Link copied", { autoClose: 1000, position: "bottom-right" }) }}
+        >
+          COPY
+        </button>
+      </small>
+
+
+      <div className={`flex ${direction === "row" ? "flex-row" : "flex-col"} items-center justify-center m-3 ${direction === "row" ? "space-x-4" : "space-y-4"}`}>
+
+        {/* My video */}
+        <section className={`flex ${direction === "row" ? "mr-12" : ""}`}>
+          <video
+            ref={myVideoRef}
+            autoPlay
+            playsInline
+            style={{ height: roomHeight, width: roomWidth }}
+            className="rounded-md bg-black"
+          />
+        </section>
+
+        {/* Other user video or waiting message */}
+        <section>
+          {otherVideoRef ? (
+            <video
+              ref={otherVideoRef}
+              autoPlay
+              playsInline
+              style={{ height: roomHeight, width: roomWidth }}
+              className="rounded-md bg-black"
+            />
+          ) : (
+            <div
+              style={{ width: roomWidth, height: roomHeight }}
+              className="font-bold bg-blue-200 text-yellow-500 flex items-center justify-center rounded-md"
+            >
+              Waiting for other user.....
+            </div>
+          )}
+        </section>
+      </div>
+
+    </center >
   );
 };
 

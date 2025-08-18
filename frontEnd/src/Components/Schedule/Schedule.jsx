@@ -118,8 +118,7 @@ export default function Schedule() {
       return;
     }
     catch (error) {
-      console.error("Error checking availability:", error);
-      toast.error("Failed to check availability. Please try again.", { autoClose: 2000 });
+      toast.error("Please login to continue", { autoClose: 2000 });
     } 
     finally {
       setIsLoading(false);

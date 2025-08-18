@@ -10,7 +10,6 @@ import { handleUserInfo } from "../Redux/Slices/userInfoSlice";
 
 export default function Navbar() {
     const navigate = useNavigate();
-    const location = useLocation();
     const { backEndLink } = links;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -25,7 +24,7 @@ export default function Navbar() {
 
     const handleLogout = async () => {
         try {
-            let response = await axios.get(`${backEndLink}/user/logout`, {
+            await axios.get(`${backEndLink}/user/logout`, {
                 withCredentials: true
             });
             window.location.reload();

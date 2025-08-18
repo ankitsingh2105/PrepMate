@@ -39,20 +39,20 @@ export default function Home() {
                             
                             <div className="flex items-center justify-between bg-white p-4 rounded-lg shadow-md">
                                 <div>
-                                    <p className="text-gray-700 font-medium">Your Credits</p>
+                                    <p className="text-gray-700 font-medium">Click above</p>
                                     <div className="flex items-center mt-1">
-                                        <span className="text-purple-600 font-bold text-xl">unlimited</span>
-                                        <span className="text-gray-500 ml-2">remaining</span>
+                                        <span className="text-purple-600 font-bold text-xl">To schedule </span>
+                                        <span className="text-gray-500 ml-2">interviews</span>
                                     </div>
                                 </div>
-                                <a 
+                                <div
                                     href="#" 
                                     className="text-purple-600 hover:text-purple-800 font-medium transition-colors"
                                 >
                                     {!loading && userDetails?.name 
                                         ? `Welcome ${userDetails.name.split(" ")[0]}` 
                                         : "Get unlimited sessions"}
-                                </a>
+                                </div>
                             </div>
                             
                             <div className="flex items-center space-x-2 text-sm text-gray-600">
@@ -60,6 +60,18 @@ export default function Home() {
                                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
                                 <span>Ace interviews</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <span>Schedule interviews</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                <span>Call friends for mock interviews</span>
                             </div>
                         </div>
                     </div>

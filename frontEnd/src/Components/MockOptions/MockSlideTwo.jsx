@@ -13,10 +13,10 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
     const roundType = mock.m1;
     const roomID = generateRandomString();
     if (roundType === 'BEH') {
-      navigate(`/behMock/room/${roomID}`);
+      navigate(`/behMock/room/${roomID}`, { state: { roomWidth: "600px", roomHeight: "600px", direction: "row" } });
       return;
     }
-    navigate(`/dsaMock/room/${roomID}`);
+    navigate(`/dsaMock/room/${roomID}`, { state: { roomWidth: "300px", roomHeight: "300px", direction: "column" } });
   };
 
   const handleRoundWithPeers = (event) => {
@@ -44,7 +44,7 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
         <div className="bg-gradient-to-r from-purple-600 to-purple-800 p-5">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-white">Select Practice Type</h2>
-            <button 
+            <button
               onClick={() => setShowMocks(false)}
               className="text-white hover:text-purple-200 transition-colors duration-200 focus:outline-none"
               aria-label="Close"
@@ -56,7 +56,7 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
             Choose how you'd like to practice your {mock.m1 === 'DSA' ? 'DSA' : 'Behavioral'} interview
           </p>
         </div>
-        
+
         <div className="p-6 space-y-4">
           <div
             onClick={(e) => handleRoundWithPeers(e)}
@@ -78,7 +78,7 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
               </div>
             </div>
           </div>
-          
+
           <div
             onClick={(e) => handleRoundWithFriends(e)}
             className="border border-purple-100 rounded-xl p-5 cursor-pointer hover:bg-purple-50 transition-colors duration-200 shadow-sm hover:shadow group"
@@ -99,11 +99,11 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
               </div>
             </div>
           </div>
-          
+
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>
-              {mock.m1 === 'DSA' ? 
-                'Practice coding problems and algorithms ' : 
+              {mock.m1 === 'DSA' ?
+                'Practice coding problems and algorithms ' :
                 'Improve your communication skills and prepare for behavioral questions'}
             </p>
           </div>
