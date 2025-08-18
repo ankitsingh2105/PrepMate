@@ -20,13 +20,13 @@ export default function SocketProvider(props) {
     const socket = useMemo(() => io(`${backEndLink}/interview`, {
         withCredentials: true,
         transports: ["websocket", "polling"]
-    }), [backEndLink]);
+    }), []);
 
-    
+
     const socketForCode = useMemo(() => io(`${backEndLink}/code-edit`, {
         withCredentials: true,
         transports: ["websocket", "polling"]
-    }), [backEndLink]);
+    }), []);
 
     return (
         <SocketContext.Provider value={socket}>
