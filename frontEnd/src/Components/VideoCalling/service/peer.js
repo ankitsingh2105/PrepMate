@@ -1,73 +1,40 @@
 class PeerService {
-    constructor() {
-        this.webRTCPeer = new RTCPeerConnection({
-            iceServers: [
-                {
-                    urls: [
-                        "stun:stun.l.google.com:19302",
-                        "stun:global.stun.twilio.com:3478",
-                    ],
-                },
-            ],
-        });
-        this.webRTCPeer.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log("New ICE candidate:", event.candidate);
-                this.onIceCandidate?.(event.candidate);
-            }
-        };
-    }
+  constructor() {
+    this.peer = new RTCPeerConnection({
+      iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+    });
 
-    setOnIceCandidate(callback) {
-        this.onIceCandidate = callback;
-    }
+    this.peer.onicecandidate = (event) => {
+      if (event.candidate) {
+        this.onIceCandidate?.(event.candidate);
+      }
+    };
+  }
 
-    async getOffer() {
-        const offer = await this.webRTCPeer.createOffer();
-        await this.webRTCPeer.setLocalDescription(new RTCSessionDescription(offer));
-        return offer;
-    }
+  setOnIceCandidate(cb) {
+    this.onIceCandidate = cb;
+  }
 
-    async getAnswer(offer) {
-        await this.webRTCPeer.setRemoteDescription(new RTCSessionDescription(offer));
-        const ans = await this.webRTCPeer.createAnswer();
-        await this.webRTCPeer.setLocalDescription(new RTCSessionDescription(ans));
-        return ans;
-    }
+  async getOffer() {
+    const offer = await this.peer.createOffer();
+    await this.peer.setLocalDescription(offer);
+    return offer;
+  }
 
-    async setRemoteDescription(ans) {
-        await this.webRTCPeer.setRemoteDescription(new RTCSessionDescription(ans));
-    }
+  async getAnswer(offer) {
+    await this.peer.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await this.peer.createAnswer();
+    await this.peer.setLocalDescription(answer);
+    return answer;
+  }
 
-    async addIceCandidate(candidate) {
-        try {
-            await this.webRTCPeer.addIceCandidate(new RTCIceCandidate(candidate));
-            console.log("Added ICE candidate:", candidate);
-        } catch (error) {
-            console.error("Error adding ICE candidate:", error);
-        }
-    }
+  async setRemoteDesc(ans) {
+    await this.peer.setRemoteDescription(new RTCSessionDescription(ans));
+  }
 
-    resetConnection() {
-        if (this.webRTCPeer) {
-            this.webRTCPeer.close();
-        }
-        this.webRTCPeer = new RTCPeerConnection({
-            iceServers: [
-                {
-                    urls: [
-                        "stun:stun.l.google.com:19302",
-                        "stun:global.stun.twilio.com:3478",
-                    ],
-                },
-            ],
-        });
-        this.webRTCPeer.onicecandidate = (event) => {
-            if (event.candidate) {
-                this.onIceCandidate?.(event.candidate);
-            }
-        };
-    }
+  async addIceCandidate(candidate) {
+    await this.peer.addIceCandidate(new RTCIceCandidate(candidate));
+  }
 }
 
 export default new PeerService();
