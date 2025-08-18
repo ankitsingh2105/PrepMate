@@ -82,7 +82,7 @@ export default function Navbar() {
                                     </button>
                                     
                                     {isMenuOpen && (
-                                        <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                        <div className="origin-bottom-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
                                             <div className="px-4 py-2 text-sm text-gray-700 border-b">
                                                 <p className="font-medium text-gray-900">Welcome,</p>
                                                 <p>{userDetails.name}</p>

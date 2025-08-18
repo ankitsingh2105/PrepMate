@@ -40,6 +40,7 @@ app.use(cookieParser());
 
 // Connect DB
 connect("mongodb+srv://WHQMCNBYGhTTwIHN:ankitchauhan21500@cluster0.2ipp9om.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+// connect("mongodb://127.0.0.1:27017/yourDatabaseName");
 
 // Routes
 app.get("/", (req, res) => res.send("API is working"));

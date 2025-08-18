@@ -4,6 +4,17 @@ const { ObjectId } = require('mongoose').Types; // or 'mongodb' if not using Mon
 const mongoose = require("mongoose");
 
 
+function generateRandomString() {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 10; i++) {
+      const randomIndex = Math.floor(Math.random() * characters.length);
+      result += characters[randomIndex];
+    }
+    return result;
+}
+
+
 async function handleUserInfo(req, response) {
 
     const { userName } = req.user;
@@ -43,21 +54,29 @@ async function handleAvailability(req, res) {
         }
 
         // 2: Lock conflicting booking atomically (with session)
-        const conflictingBooking = await mockModel.findOneAndUpdate(
+        // $ne is not equal to 
+        // locking the slot so no one can grab
+        const isBookingAvailable = await mockModel.findOneAndUpdate(
             {
                 mockType,
                 schedule: checkSchedule,
                 user: { $ne: userId },
                 tempLock: false
             },
+            // templock:true, makes it unavailable now
             { $set: { tempLock: true } },
             { new: true, session }
+            // By default, findOneAndUpdate returns the document before the update.
+            // new: true tells Mongoose to return the document after the update.
+            // session : tells Mongoose to run this query as part of the MongoDB transaction session you
         );
 
-        if (conflictingBooking) {
-            const idd = conflictingBooking.user.valueOf();
-            const otherUserTicketID = conflictingBooking._id.valueOf();
+        if (isBookingAvailable) {
+            // get the IDS of both the users
+            const idd = isBookingAvailable.user.valueOf();
+            const otherUserTicketID = isBookingAvailable._id.valueOf();
 
+            // make a new mock for existing uers
             const newMockModel = new mockModel({
                 mockType,
                 schedule: checkSchedule,
@@ -68,10 +87,12 @@ async function handleAvailability(req, res) {
             const bookingId = newMockModel._id.valueOf();
 
             // Update both users with booking info (with session)
+            // so we can display in the user profile
+            const roomID = generateRandomString();
             await userModel.findOneAndUpdate(
                 { _id: userId },
                 {
-                    $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId: bookingId, otherUserTicketID } }
+                    $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId: bookingId, otherUserTicketID, roomID }}
                 },
                 { session }
             );
@@ -79,7 +100,7 @@ async function handleAvailability(req, res) {
             await userModel.findOneAndUpdate(
                 { _id: idd },
                 {
-                    $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId: otherUserTicketID, otherUserTicketID: bookingId } }
+                    $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId: otherUserTicketID, otherUserTicketID: bookingId, roomID } }
                 },
                 { session }
             );
@@ -93,7 +114,8 @@ async function handleAvailability(req, res) {
                 message: "Your booking is confirmed, please check your profile",
                 code: 2
             });
-        } else {
+        } 
+        else {
             // 3: No conflict - create new booking
             const newMockModel = new mockModel({
                 mockType,
@@ -151,20 +173,20 @@ async function handleUpdateUserInfo(req, response) {
 }
 
 async function handleCancelBooking(req, res) {
-    const { myUserId, otherUserId, myTicketId, otherUserTicketID, mockType, bookingTime } = req.body;
+    const { myUserId, otherUserId, myTicketId, otherUserTicketID } = req.body;
 
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        // Remove booking entry from myUser
+        // Remove booking entry for me
         await userModel.findOneAndUpdate(
             { _id: myUserId },
             { $pull: { bookings: { otherUserTicketID } } },
             { new: true, session }
         );
 
-        // Remove booking entry from otherUser
+        // Remove booking entry for otherUser
         await userModel.findOneAndUpdate(
             { _id: otherUserId },
             { $pull: { bookings: { myTicketId: otherUserTicketID } } },

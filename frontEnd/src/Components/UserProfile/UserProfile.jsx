@@ -29,6 +29,7 @@ export default function UserProfile() {
             console.log("uerDetails are ::", userDetails);
             setUserData(userDetails);
             setBookings(userDetails.bookings);
+            console.log(userDetails.bookings);
         };
         fetchUserData();
     }, [userDetails]);
@@ -104,7 +105,7 @@ export default function UserProfile() {
 
     return (
     <>
-            <ToastContainer position="top-right" autoClose={3000} />
+            <ToastContainer position="bottom-right" autoClose={3000} />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
             <section className="bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all hover:shadow-2xl duration-300 border border-purple-100">
@@ -119,9 +120,9 @@ export default function UserProfile() {
                 <div className="p-6">
                     <div className="space-y-4">
                         <div className="grid grid-cols-4 p-4 bg-purple-50 rounded-lg shadow-sm font-semibold text-purple-900 sticky top-0 z-10">
-                            <span className="flex text-center">#</span>
                             <span className="flex text-center">Interview Type</span>
                             <span className="flex text-center">Schedule</span>
+                            <span className="flex text-center">Room Link</span>
                             <span className="flex text-center">Action</span>
                         </div>
 
@@ -132,11 +133,6 @@ export default function UserProfile() {
                                         key={index}
                                         className="grid grid-cols-4 p-4 bg-white border border-gray-100 rounded-xl hover:bg-purple-50 transition-all duration-200 transform hover:-translate-y-1 hover:shadow-md"
                                     >
-                                        <span className="flex text-center">
-                                            <span className="h-7 w-7 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-sm">
-                                                {index + 1}
-                                            </span>
-                                        </span>
 
                                         <span className="text-center font-medium text-gray-800 flex items-center">
                                             <span className={`inline-block w-2 h-2 rounded-full mr-2 ${booking.mockType === "DSA" ? "bg-blue-500" : "bg-green-500"}`}></span>
@@ -151,6 +147,12 @@ export default function UserProfile() {
                                             <span className="flex items-center text-xs text-gray-500 mt-1">
                                                 <FiClock className="mr-1" />
                                                 {formatTime(booking.bookingTime)}
+                                            </span>
+                                        </span>
+
+                                        <span className="flex text-center">
+                                            <span className="h-7 w-7 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-sm">
+                                                {booking.roomID}
                                             </span>
                                         </span>
 

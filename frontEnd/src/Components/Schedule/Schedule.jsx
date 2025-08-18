@@ -128,7 +128,7 @@ export default function Schedule() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50 py-10 px-4 sm:px-6 lg:px-8">
-      <ToastContainer position="top-right" />
+      <ToastContainer position="bottom-right" />
 
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">

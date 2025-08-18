@@ -12,6 +12,7 @@ import DSAScreen from "./Components/DSAScreen/DSAScreen"
 import Schedule from "./Components/Schedule/Schedule"
 import UserProfile from "./Components/UserProfile/UserProfile"
 import About from "./Components/AboutSection/About";
+import "react-toastify/dist/ReactToastify.css";
 function App() {
 
   return (
