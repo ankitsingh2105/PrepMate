@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "../context/SocketProvider";
-import PeerService from "../peer";
+import PeerService from "../service/peer";
 
 const Room = ({ email, name, room }) => {
     const myVideoRef = useRef();
