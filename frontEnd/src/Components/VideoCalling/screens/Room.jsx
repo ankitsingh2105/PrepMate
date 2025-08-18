@@ -1,47 +1,49 @@
 import React, { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
+import { useSocket } from "../context/SocketProvider";
 
 const Room = ({ email, name, room }) => {
   const myVideoRef = useRef();
   const otherVideoRef = useRef();
   const pcRef = useRef(null);
-  const socketRef = useRef(null);
+  const socket = useSocket(); // Use provider socket
   const [joined, setJoined] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-      socketRef.current = io("/interview");
+      if (!socket) return;
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       myVideoRef.current.srcObject = stream;
 
-      socketRef.current.emit("room:join", { email, room, name });
+      socket.emit("room:join", { email, room, name });
 
-      socketRef.current.on("room:joined", ({ users }) => {
+      socket.on("room:joined", ({ users }) => {
         console.log("Joined room:", users);
         setJoined(true);
 
+        // If 2 users already, caller initiates
         if (users.length === 2) {
-          createPeerConnection(stream, true); // caller
+          createPeerConnection(stream, true, users.find(id => id !== socket.id));
         }
       });
 
-      socketRef.current.on("user:joined", ({ socketID }) => {
+      socket.on("user:joined", ({ socketID }) => {
         console.log("Other user joined:", socketID);
-        createPeerConnection(stream, false, socketID); // receiver
+        createPeerConnection(stream, false, socketID);
       });
 
-      socketRef.current.on("incoming:call", async ({ from, offer }) => {
+      socket.on("incoming:call", async ({ from, offer }) => {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(offer));
         const answer = await pcRef.current.createAnswer();
         await pcRef.current.setLocalDescription(answer);
-        socketRef.current.emit("call:accepted", { to: from, answer });
+        socket.emit("call:accepted", { to: from, answer });
       });
 
-      socketRef.current.on("call:accepted", async ({ answer }) => {
+      socket.on("call:accepted", async ({ answer }) => {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
       });
 
-      socketRef.current.on("ice:candidate", ({ candidate }) => {
+      socket.on("ice:candidate", ({ candidate }) => {
         pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
       });
     };
@@ -50,11 +52,11 @@ const Room = ({ email, name, room }) => {
 
     return () => {
       if (pcRef.current) pcRef.current.close();
-      if (socketRef.current) socketRef.current.disconnect();
+      if (socket) socket.off(); // Remove listeners
     };
-  }, []);
+  }, [socket]);
 
-  const createPeerConnection = (stream, isCaller, remoteID = null) => {
+  const createPeerConnection = (stream, isCaller, remoteID) => {
     const pc = new RTCPeerConnection();
     pcRef.current = pc;
 
@@ -69,7 +71,7 @@ const Room = ({ email, name, room }) => {
     // ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate && remoteID) {
-        socketRef.current.emit("ice:candidate", { to: remoteID, candidate: event.candidate });
+        socket.emit("ice:candidate", { to: remoteID, candidate: event.candidate });
       }
     };
 
@@ -77,8 +79,7 @@ const Room = ({ email, name, room }) => {
       pc.onnegotiationneeded = async () => {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        const targetID = Array.from(pcRef.current ? pcRef.current.remoteDescription : []) // simplified
-        socketRef.current.emit("user:call", { to: remoteID, offer });
+        socket.emit("user:call", { to: remoteID, offer });
       };
     }
   };

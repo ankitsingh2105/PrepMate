@@ -21,6 +21,8 @@ export default function SocketProvider(props) {
         withCredentials: true,
         transports: ["websocket", "polling"]
     }), [backEndLink]);
+
+    
     const socketForCode = useMemo(() => io(`${backEndLink}/code-edit`, {
         withCredentials: true,
         transports: ["websocket", "polling"]
