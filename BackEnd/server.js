@@ -61,7 +61,9 @@ interviewNamespace.on("connection", (socket) => {
   console.log(`🔌 Socket ${socket.id} connected`);
 
   socket.on("room:join", ({ email, room, name }) => {
+    console.log(email, room, name);
     if (!email || !room || !name) {
+      console.log("some error");
       socket.emit("room:error", { message: "Invalid data" });
       return;
     }
@@ -85,6 +87,7 @@ interviewNamespace.on("connection", (socket) => {
 
     // Notify others
     const otherUsers = Array.from(roomSet).filter(id => id !== socket.id);
+    console.log("otherUser :: " , otherUsers);
     if (otherUsers.length > 0) {
       interviewNamespace.to(otherUsers[0]).emit("user:joined", { email, socketID: socket.id, name });
     }

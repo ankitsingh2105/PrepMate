@@ -1,39 +1,44 @@
 class PeerService {
-    constructor() {
-        this.peer = new RTCPeerConnection({
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-                { urls: "stun:stun1.l.google.com:19302" },
-                // Optional: Add a TURN server if NAT issues persist
-                // {
-                //     urls: "turn:openrelay.metered.ca:80",
-                //     username: "openrelayproject",
-                //     credential: "openrelayproject"
-                // }
-            ]
-        });
-    }
+  constructor() {
+    this.peer = null;
+  }
 
-    async getOffer() {
-        const offer = await this.peer.createOffer();
-        await this.peer.setLocalDescription(offer);
-        return offer;
-    }
+  createPeerConnection() {
+    this.peer = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    return this.peer;
+  }
 
-    async getAnswer(offer) {
-        await this.peer.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await this.peer.createAnswer();
-        await this.peer.setLocalDescription(answer);
-        return answer;
-    }
+  async getOffer() {
+    const offer = await this.peer.createOffer();
+    await this.peer.setLocalDescription(offer);
+    return offer;
+  }
 
-    async setRemoteDesc(desc) {
-        await this.peer.setRemoteDescription(new RTCSessionDescription(desc));
-    }
+  async getAnswer(offer) {
+    await this.peer.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await this.peer.createAnswer();
+    await this.peer.setLocalDescription(answer);
+    return answer;
+  }
 
-    async addIceCandidate(candidate) {
-        await this.peer.addIceCandidate(new RTCIceCandidate(candidate));
+  async setRemoteDesc(desc) {
+    await this.peer.setRemoteDescription(new RTCSessionDescription(desc));
+  }
+
+  async addIceCandidate(candidate) {
+    if (this.peer && candidate) {
+      await this.peer.addIceCandidate(new RTCIceCandidate(candidate));
     }
+  }
+
+  close() {
+    if (this.peer) {
+      this.peer.close();
+      this.peer = null;
+    }
+  }
 }
 
 export default new PeerService();
