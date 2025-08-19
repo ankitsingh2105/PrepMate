@@ -34,6 +34,8 @@ async function handleAvailability(req, res) {
     const { timeSlot, mockType, userId } = req.body;
     const { date, time } = timeSlot;
     const checkSchedule = date + " " + time;
+    console.log(checkSchedule);
+    console.log(new Date(checkSchedule));
 
     const session = await mongoose.startSession();
 
@@ -59,7 +61,7 @@ async function handleAvailability(req, res) {
         const isBookingAvailable = await mockModel.findOneAndUpdate(
             {
                 mockType,
-                schedule: checkSchedule,
+                schedule: new Date(checkSchedule),
                 user: { $ne: userId },
                 tempLock: false
             },
@@ -79,7 +81,7 @@ async function handleAvailability(req, res) {
             // make a new mock for existing uers
             const newMockModel = new mockModel({
                 mockType,
-                schedule: checkSchedule,
+                schedule: new Date(checkSchedule),
                 tempLock: true,
                 user: userId
             });
@@ -119,7 +121,7 @@ async function handleAvailability(req, res) {
             // 3: No conflict - create new booking
             const newMockModel = new mockModel({
                 mockType,
-                schedule: checkSchedule,
+                schedule: new Date(checkSchedule),
                 tempLock: false,
                 user: userId
             });
