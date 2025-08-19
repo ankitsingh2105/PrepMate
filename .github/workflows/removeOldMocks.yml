@@ -1,0 +1,34 @@
+name: Cleanup Old Mocks   # Name of the workflow (you'll see this in GitHub Actions tab)
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # Trigger workflow automatically every day at 00:00 UTC
+  workflow_dispatch:      # Allow manual trigger from GitHub UI
+
+jobs:
+  cleanup:                # Define a job named "cleanup"
+    runs-on: ubuntu-latest  # Use GitHub's Ubuntu virtual machine
+
+    steps:                # Define the steps inside this job
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        # Pulls your repository code into the Ubuntu VM
+        # Needed so the runner has access to cleanup.js
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+        # Installs Node.js v18 on the VM so we can run JavaScript
+
+      - name: Install mongoose
+        run: npm install mongoose
+        # Instead of `npm install`, we only install mongoose
+        # because cleanup.js only depends on mongoose
+
+      - name: Run cleanup script
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          # Inject MongoDB connection string securely from GitHub Secrets
+        run: node cleanup.js
+        # Runs the cleanup.js script to delete old mocks

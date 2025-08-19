@@ -60,7 +60,7 @@ export default function Schedule() {
   function getNextFourDays() {
     const dates = [];
     const today = new Date();
-    for (let i = 0; i < 4; i++) {
+    for (let i = -2; i < 4; i++) {
       const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + i + 1);
       dates.push(nextDate.toDateString());
