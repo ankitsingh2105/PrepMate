@@ -44,7 +44,7 @@ async function handleAvailability(req, res) {
         const existingBooking = await mockModel.findOne({
             user: userId,
             mockType,
-            schedule: checkSchedule
+            schedule: new Date(checkSchedule)
         }).session(session);
 
         if (existingBooking) {
