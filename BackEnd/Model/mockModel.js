@@ -5,7 +5,7 @@ const mockSchema = new mongoose.Schema({
         type : String,
     },
     schedule : {
-        type : String
+        type : Date
     },
     tempLock : {
         type : Boolean,
