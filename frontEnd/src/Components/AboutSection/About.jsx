@@ -90,7 +90,7 @@ export default function About() {
 
                 <div className="mt-20 text-center">
                     <p className="text-gray-600 max-w-2xl mx-auto">
-                        Join thousands of professionals who have accelerated their career growth through our structured practice sessions and supportive community.
+                        Join our platform today and ace your interviews with real-time mock practice
                     </p>
                     <button className="mt-8 bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1">
                         Start Your Journey

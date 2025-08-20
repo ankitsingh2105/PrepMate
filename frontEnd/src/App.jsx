@@ -12,7 +12,9 @@ import DSAScreen from "./Components/DSAScreen/DSAScreen"
 import Schedule from "./Components/Schedule/Schedule"
 import UserProfile from "./Components/UserProfile/UserProfile"
 import About from "./Components/AboutSection/About";
+import NotFound from "../NotFound"
 import "react-toastify/dist/ReactToastify.css";
+
 function App() {
 
   return (
@@ -28,7 +30,9 @@ function App() {
               <Route path="/dsaMock/room/:id" element={<DSAScreen />} />
               <Route path='/behMock/room/:id' element={<Room roomHeight={500} roomWidth={500} />} />
               <Route path="/schedule" element = {<Schedule/>}/>
+              <Route path="*" element={<NotFound />} />
               <Route path="/user/profile/:userName" element = {<UserProfile/>}/>
+
             </Routes>
           </BrowserRouter>
         </Provider>

@@ -13,7 +13,7 @@ router.post("/", async (req, res) => {
         let user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({
-                message: "User already with this email",
+                message: "Email already taken",
             });
         }
 

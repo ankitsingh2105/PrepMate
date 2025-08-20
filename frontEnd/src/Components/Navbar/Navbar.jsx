@@ -27,6 +27,7 @@ export default function Navbar() {
             await axios.get(`${backEndLink}/user/logout`, {
                 withCredentials: true
             });
+            sessionStorage.setItem("isLoggedIn", false);
             window.location.reload();
         }
         catch (error) {

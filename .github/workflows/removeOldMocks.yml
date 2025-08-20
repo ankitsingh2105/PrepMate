@@ -1,13 +1,13 @@
-name: Clean Old Mocks   # Name of the workflow (you'll see this in GitHub Actions tab)
+name: Clean Old Mocks # Name of the workflow (you'll see this in GitHub Actions tab)
 
 on:
   schedule:
-    - cron: "30 18 * * *"   # Every day 18:30 UTC = 12:00 AM IST
-  workflow_dispatch:         # Allow manual trigger from GitHub UI
+    - cron: "30 18 * * *" # Every day 18:30 UTC = 12:00 AM IST
+  workflow_dispatch: # Allow manual trigger from GitHub UI
 
 jobs:
-  cleanup:                  # Define a job named "cleanup"
-    runs-on: ubuntu-latest   # Use GitHub's Ubuntu virtual machine
+  cleanup: # Define a job named "cleanup"
+    runs-on: ubuntu-latest # Use GitHub's Ubuntu virtual machine
 
     steps:
       - name: Checkout repository
@@ -26,5 +26,5 @@ jobs:
       - name: Run cleanup script
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
-        run: node Backend/cleanUp.js
+        run: node BackEnd/cleanUp.js
         # Runs the cleanup.js script

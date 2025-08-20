@@ -9,10 +9,15 @@ export const handleUserInfo = createAsyncThunk("/getUserInfo", async () => {
         const response = await axios.get(`${backEndLink}/user/getInfo`, {
             withCredentials: true,
         });
+        sessionStorage.setItem("isLoggedIn" , true);
         return response.data ;
     }
-    catch(e){
-        console.log(e);
+    catch(error){
+        console.log("Error at userSlice :: " , error);
+        console.log(error.status);
+        if(error.status === 401){
+            sessionStorage.setItem("isLoggedIn" , false);
+        }
     }
 })
 

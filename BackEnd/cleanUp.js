@@ -7,10 +7,12 @@ async function cleanUp() {
     await mongoose.connect("mongodb+srv://WHQMCNBYGhTTwIHN:ankitchauhan21500@cluster0.2ipp9om.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
 
     const today = new Date();
-    console.log(today);
     const result = await mockModel.deleteMany({ schedule: { $lt: today } });
-    console.log(result);
+    console.log("Date :: ", today.toLocaleDateString());
+    console.log("Time :: ", today.toLocaleTimeString());
+    console.log("Result :: ", result);
     await mongoose.disconnect();
     process.exit(0);
 }
 cleanUp(); 
+
