@@ -14,7 +14,6 @@ function generateRandomString() {
     return result;
 }
 
-
 async function handleUserInfo(req, response) {
 
     const { userName } = req.user;
@@ -34,15 +33,12 @@ async function handleAvailability(req, res) {
     const { timeSlot, mockType, userId } = req.body;
     const { date, time } = timeSlot;
     const checkSchedule = date + " " + time;
-    console.log(checkSchedule);
-    console.log(new Date(checkSchedule));
-
     const session = await mongoose.startSession();
 
     try {
         session.startTransaction();
 
-        // 1: Check existing booking (with session)
+        // 1️⃣ Prevent duplicate booking for same slot/user
         const existingBooking = await mockModel.findOne({
             user: userId,
             mockType,
@@ -55,59 +51,76 @@ async function handleAvailability(req, res) {
             return res.send({ message: "You cannot book two entries for the same time", code: 1 });
         }
 
-        // 2: Lock conflicting booking atomically (with session)
-        // $ne is not equal to 
-        // locking the slot so no one can grab
-        const isBookingAvailable = await mockModel.findOneAndUpdate(
+        // 2️⃣ Insert myself as a "waiting" booking first
+        const myBooking = new mockModel({
+            mockType,
+            schedule: new Date(checkSchedule),
+            tempLock: false,
+            user: userId
+        });
+        await myBooking.save({ session });
+
+        // 3️⃣ Try to atomically grab a partner
+        const partner = await mockModel.findOneAndUpdate(
             {
                 mockType,
                 schedule: new Date(checkSchedule),
                 user: { $ne: userId },
                 tempLock: false
             },
-            // templock:true, makes it unavailable now
             { $set: { tempLock: true } },
             { new: true, session }
-            // By default, findOneAndUpdate returns the document before the update.
-            // new: true tells Mongoose to return the document after the update.
-            // session : tells Mongoose to run this query as part of the MongoDB transaction session you
         );
 
-        if (isBookingAvailable) {
-            // get the IDS of both the users
-            const idd = isBookingAvailable.user.valueOf();
-            const otherUserTicketID = isBookingAvailable._id.valueOf();
-
-            // make a new mock for existing uers
-            const newMockModel = new mockModel({
-                mockType,
-                schedule: new Date(checkSchedule),
-                tempLock: true,
-                user: userId
-            });
-
-            const bookingId = newMockModel._id.valueOf();
-
-            // Update both users with booking info (with session)
-            // so we can display in the user profile
+        if (partner) {
+            // 🎯 Match found
+            const myTicketId = myBooking._id.valueOf();
+            const otherUserTicketID = partner._id.valueOf();
             const roomID = generateRandomString();
+
+            // Update both users
             await userModel.findOneAndUpdate(
                 { _id: userId },
                 {
-                    $push: { bookings: { myUserId: userId, otherUserId: idd, bookingTime: checkSchedule, mockType, myTicketId: bookingId, otherUserTicketID, roomID }}
+                    $push: {
+                        bookings: {
+                            myUserId: userId,
+                            otherUserId: partner.user,
+                            bookingTime: checkSchedule,
+                            mockType,
+                            myTicketId,
+                            otherUserTicketID,
+                            roomID
+                        }
+                    }
                 },
                 { session }
             );
 
             await userModel.findOneAndUpdate(
-                { _id: idd },
+                { _id: partner.user },
                 {
-                    $push: { bookings: { myUserId: idd, otherUserId: userId, bookingTime: checkSchedule, mockType, myTicketId: otherUserTicketID, otherUserTicketID: bookingId, roomID } }
+                    $push: {
+                        bookings: {
+                            myUserId: partner.user,
+                            otherUserId: userId,
+                            bookingTime: checkSchedule,
+                            mockType,
+                            myTicketId: otherUserTicketID,
+                            otherUserTicketID: myTicketId,
+                            roomID
+                        }
+                    }
                 },
                 { session }
             );
 
-            await newMockModel.save({ session });
+            // Mark myself as locked (finalized)
+            await mockModel.findByIdAndUpdate(
+                myBooking._id,
+                { $set: { tempLock: true } },
+                { session }
+            );
 
             await session.commitTransaction();
             session.endSession();
@@ -116,18 +129,8 @@ async function handleAvailability(req, res) {
                 message: "Your booking is confirmed, please check your profile",
                 code: 2
             });
-        } 
-        else {
-            // 3: No conflict - create new booking
-            const newMockModel = new mockModel({
-                mockType,
-                schedule: new Date(checkSchedule),
-                tempLock: false,
-                user: userId
-            });
-
-            await newMockModel.save({ session });
-
+        } else {
+            // 🙋 No match → stay waiting
             await session.commitTransaction();
             session.endSession();
 
@@ -136,14 +139,15 @@ async function handleAvailability(req, res) {
                 code: 3
             });
         }
-    }
-    catch (error) {
+
+    } catch (error) {
         await session.abortTransaction();
         session.endSession();
         console.error("Error in handling availability:", error);
         return res.status(500).send("Server error");
     }
 }
+
 
 
 function handleUserLogout(req, response) {
