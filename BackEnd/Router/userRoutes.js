@@ -5,7 +5,7 @@ const { handleUserInfo, handleUserLogout, handleAvailability, handleUpdateUserIn
 
 router.get("/getInfo", verifyUserMiddleware, handleUserInfo);
 router.get("/logout", verifyUserMiddleware, handleUserLogout);
-router.post("/checkAvailability", verifyUserMiddleware, handleAvailability);
+router.post("/checkAvailability", handleAvailability);
 router.patch("/updateInformation", verifyUserMiddleware, handleUpdateUserInfo);
 router.post("/cancelBooking", verifyUserMiddleware, handleCancelBooking);
 
