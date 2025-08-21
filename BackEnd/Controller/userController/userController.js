@@ -150,7 +150,7 @@ async function handleAvailability(req, res) {
                 code: 3,
             });
         }
-    } 
+    }
     catch (error) {
         await session.abortTransaction();
         session.endSession();
@@ -190,7 +190,7 @@ async function handleUpdateUserInfo(req, response) {
 
 async function handleCancelBooking(req, res) {
     const { myUserId, otherUserId, myTicketId, otherUserTicketID } = req.body;
-
+    console.log("op");
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -203,24 +203,32 @@ async function handleCancelBooking(req, res) {
         );
 
         // Remove booking entry for otherUser
+        // $pull is update operator that help to remove elemet from array
+        // $set is update operator for updating array elements  
         await userModel.findOneAndUpdate(
             { _id: otherUserId },
             { $pull: { bookings: { myTicketId: otherUserTicketID } } },
             { new: true, session }
         );
+        console.log("myTicketId:", myTicketId, "otherUserTicketID:", otherUserTicketID);
 
         // Remove mock booking from myUser side
         await mockModel.findOneAndDelete({ _id: myTicketId }, { session });
 
         // Remove mock booking from otherUser side
-        await mockModel.findOneAndDelete({ _id: otherUserTicketID }, { session });
+        await mockModel.findOneAndUpdate({ _id: otherUserTicketID },
+            {
+                $set: { tempLock: false },
+            },
+            { session });
 
         // Commit transaction
         await session.commitTransaction();
         session.endSession();
 
         res.send("Booking cancelled successfully");
-    } catch (error) {
+    } 
+    catch (error) {
         // Abort transaction if error occurs
         await session.abortTransaction();
         session.endSession();
