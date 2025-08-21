@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import connectJs from "../../connect";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import "./UserProfile.css";
 import { toast, ToastContainer } from "react-toastify";
 import io from "socket.io-client";
 import { useDispatch, useSelector } from "react-redux";
@@ -13,6 +12,7 @@ export default function UserProfile() {
   const userInfo = useSelector((state) => state.userInfo);
   const { userDetails, loading } = userInfo;
   const { backEndLink } = connectJs;
+  // console.log("linked is :: " , backEndLink);
   const isLoggedIn = sessionStorage.getItem("isLoggedIn");
   const [userData, setUserData] = useState({
     userName: "",
@@ -27,11 +27,11 @@ export default function UserProfile() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if(isLoggedIn === "false") return;
-      console.log("uerDetails are ::", userDetails);
+      if (isLoggedIn === "false") return;
+      // console.log("uerDetails are ::", userDetails);
       setUserData(userDetails);
       setBookings(userDetails.bookings);
-      console.log(userDetails.bookings);
+      // console.log(userDetails.bookings);
     };
     fetchUserData();
   }, [userDetails]);
@@ -42,6 +42,7 @@ export default function UserProfile() {
   }, [refresh, dispatch]);
 
   const socket = io(`${backEndLink}/notification`);
+  // console.log("opo :: " , backEndLink);
 
   const handleBookingCancel = async (
     myUserId,
@@ -84,7 +85,7 @@ export default function UserProfile() {
       });
       dispatch(handleUserInfo());
     } catch (error) {
-      console.log("Error cancelling booking:", error);
+      // console.log("Error cancelling booking:", error);
     }
   };
 
@@ -115,13 +116,13 @@ export default function UserProfile() {
 
   useEffect(() => {
     socket.on("connect", () => {
-      console.log("Connected to WebSocket with ID:", socket.id);
+      // console.log("Connected to WebSocket with ID:", socket.id);
     });
 
     socket.emit("register", userDetails?._id); // Register userId
 
     socket.on("notification", ({ message }) => {
-      console.log("Notification received:", message);
+      // console.log("Notification received:", message);
       dispatch(handleUserInfo());
       toast(message);
     });
@@ -134,13 +135,9 @@ export default function UserProfile() {
 
   const handleRoomIDnavigate = (roomID, type) => {
     if (type === "DSA") {
-      navigate(`/dsaMock/room/${roomID}`, {
-        state: { roomWidth: "300px", roomHeight: "300px", direction: "column" },
-      });
+      navigate(`/dsaMock/room/${roomID}?roomWidth=350&roomHeight=200&direction=column`);
     } else {
-      navigate(`/behMock/room/${roomID}`, {
-        state: { roomWidth: "600px", roomHeight: "600px", direction: "row" },
-      });
+      navigate(`/behMock/room/${roomID}?roomWidth=500&roomHeight=450&direction=row`);
     }
   };
 

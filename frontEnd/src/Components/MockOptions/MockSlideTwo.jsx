@@ -13,10 +13,10 @@ export default function MockSlideTwo({ setShowMocks, mock, setMock }) {
     const roundType = mock.m1;
     const roomID = generateRandomString();
     if (roundType === 'BEH') {
-      navigate(`/behMock/room/${roomID}`, { state: { roomWidth: "600px", roomHeight: "600px", direction: "row" } });
+      navigate(`/behMock/room/${roomID}?roomWidth=500&roomHeight=450&direction=row`);
       return;
     }
-    navigate(`/dsaMock/room/${roomID}`, { state: { roomWidth: "300px", roomHeight: "300px", direction: "column" } });
+     navigate(`/dsaMock/room/${roomID}?roomWidth=350&roomHeight=200&direction=column`);
   };
 
   const handleRoundWithPeers = (event) => {

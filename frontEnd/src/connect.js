@@ -1,5 +1,4 @@
 const connectJs = {
-    backEndLink : "https://prepmate-xld3.onrender.com"
+    backEndLink : import.meta.env.VITE_BACKEND_LINK
 }
 export default connectJs;
-// backEndLink : "http://localhost:3000"

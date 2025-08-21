@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSocket } from "../context/SocketProvider";
 import PeerService from "../service/peer";
 import { useSelector } from "react-redux";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 const isLoggedIn = sessionStorage.getItem("isLoggedIn");
 const Room = ({}) => {
@@ -10,14 +10,18 @@ const Room = ({}) => {
   const otherVideoRef = useRef();
   const socket = useSocket();
   const [joined, setJoined] = useState(false);
-  const url = useLocation();
   const userInfo = useSelector((state) => state.userInfo);
   const { userDetails } = userInfo;
   const { name, email } = userDetails || {};
-  const room = url.pathname.split("/")[3];
-  console.log(url);
-  const { roomWidth, roomHeight, direction } = url.state || {};
-  console.log(roomWidth, roomHeight, direction);
+  const { room } = useParams();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+
+  const roomWidth = parseInt(queryParams.get("roomWidth"));
+  const roomHeight = parseInt(queryParams.get("roomHeight"));
+  const direction = queryParams.get("direction");
+
+  console.log(room, roomWidth, roomHeight, direction);
 
   useEffect(() => {
     const init = async () => {
@@ -157,14 +161,10 @@ const Room = ({}) => {
               <b className="text-red-500">Connecting...</b>
             )}
           </center>
-          <section>Share this link to other users</section>
-          <small className="flex items-center justify-center space-x-2">
-            {/* URL display box */}
+          <small className="flex items-center justify-center font-bold space-x-2 mt-3 ">
             <section className="p-3 bg-gray-200 rounded-md">
-              {window.location.href}
+              Share this url to other user
             </section>
-
-            {/* Copy button */}
             <button
               className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
               onClick={() => {

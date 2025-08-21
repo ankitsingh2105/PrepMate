@@ -4,6 +4,7 @@ const http = require("http");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
+require('dotenv').config({ quiet: true });
 
 // Routes
 const loginRouter = require("./Router/login");
@@ -18,7 +19,6 @@ const io = new Server(server, {
       "http://localhost:5173",
       "https://prep-mate-one.vercel.app",
       "https://prepmatee.vercel.app",
-      "https://your-frontend-vercel-link.com" // add your deployed frontend link
     ],
     credentials: true
   },
@@ -31,7 +31,6 @@ app.use(cors({
     "http://localhost:5173",
     "https://prep-mate-one.vercel.app",
     "https://prepmatee.vercel.app",
-    "https://your-frontend-vercel-link.com"
   ],
   credentials: true
 }));
@@ -39,8 +38,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Connect DB
-connect("mongodb+srv://WHQMCNBYGhTTwIHN:ankitchauhan21500@cluster0.2ipp9om.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
-// connect("mongodb://127.0.0.1:27017/yourDatabaseName");
+connect(process.env.MONGODB_ATLAS_URI);
 
 // Routes
 app.get("/", (req, res) => res.send("API is working"));
@@ -127,6 +125,7 @@ interviewNamespace.on("connection", (socket) => {
 // ---------------- CODE EDIT NAMESPACE ----------------
 codeEditNamespace.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
+    console.log("user joinedn the coding space :: ", room , " :: " , socket.id)
     socket.join(room);
     socket.to(room).emit("newUserJoin", { newUserId: socket.id });
   });
@@ -162,7 +161,7 @@ notificationNamespace.on("connection", (socket) => {
 });
 
 // ---------------- START SERVER ---------------
-const PORT = 3000;
+const PORT = process.env.PORT;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 }); 
