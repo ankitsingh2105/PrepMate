@@ -38,33 +38,31 @@ async function handleAvailability(req, res) {
     try {
         session.startTransaction();
 
-        // 1: Check existing booking (with session)
-        const existingBooking = await mockModel
-            .findOne({
-                user: userId,
-                mockType,
-                schedule: new Date(checkSchedule),
-            })
-            .session(session);
-
-        if (existingBooking) {
-            await session.abortTransaction();
-            session.endSession();
-            return res.send({
-                message: "You cannot book two entries for the same time",
-                code: 1,
-            });
-        }
-
         // make a new mock for existing (myself) user
+        // todo : i have added unique compound index so no duplicates allowed
         const myBooking = new mockModel({
             mockType,
             schedule: new Date(checkSchedule),
-            tempLock: true,
             user: userId,
         });
+        try {
+            await myBooking.save({ session });
+        }
+        catch (error) {
+            if (error.code == 11000) {
+                await session.abortTransaction();
+                session.endSession();
+                return res.send({
+                    message: "You cannot book two entries for the same time",
+                    code: 1,
+                });
+            }
+            return res.send({
+                message: "Something went wrong",
+                code: 4
+            })
+        }
 
-        await myBooking.save({ session });
 
         // 2: Lock conflicting booking atomically (with session)
         // $ne is not equal to
@@ -227,7 +225,7 @@ async function handleCancelBooking(req, res) {
         session.endSession();
 
         res.send("Booking cancelled successfully");
-    } 
+    }
     catch (error) {
         // Abort transaction if error occurs
         await session.abortTransaction();
