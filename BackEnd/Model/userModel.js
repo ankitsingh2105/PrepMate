@@ -24,6 +24,9 @@ const UserSchema = new mongoose.Schema({
     },
     bookings: {
         type: Array
+    },
+    notification : {
+        type : [{type : mongoose.Schema.Types.ObjectId, ref : "Notification"}],
     }
 });
 

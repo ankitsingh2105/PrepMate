@@ -3,20 +3,20 @@ const mongoose = require("mongoose");
 const mockSchema = new mongoose.Schema({
     mockType: {
         type: String,
+        required : true,
     },
     schedule: {
-        type: Date
+        type: Date,
+        required : true,
     },
     tempLock: {
         type: Boolean,
         default: true,
     },
-    ifAddedToList: {
-        type: Boolean,
-    },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
+        require : true
     },
 })
 

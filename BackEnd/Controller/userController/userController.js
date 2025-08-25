@@ -1,18 +1,8 @@
 const userModel = require("../../Model/userModel");
 const mockModel = require("../../Model/mockModel");
-const { ObjectId } = require("mongoose").Types; // or 'mongodb' if not using Mongoose
 const mongoose = require("mongoose");
-
-function generateRandomString() {
-    const characters =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let result = "";
-    for (let i = 0; i < 10; i++) {
-        const randomIndex = Math.floor(Math.random() * characters.length);
-        result += characters[randomIndex];
-    }
-    return result;
-}
+require("../../Model/notificationModel");
+const publishBookingRequestToRabbitMQServer = require("../../producers/bookingPublisher")
 
 async function handleUserInfo(req, response) {
     const { userName } = req.user;
@@ -28,132 +18,71 @@ async function handleUserInfo(req, response) {
 
 async function handleAvailability(req, res) {
     const { timeSlot, mockType, userId } = req.body;
-    const { date, time } = timeSlot;
-    const checkSchedule = date + " " + time;
-    console.log(checkSchedule);
-    console.log(new Date(checkSchedule));
-
-    const session = await mongoose.startSession();
+    const checkSchedule = new Date(timeSlot.date + " " + timeSlot.time);
+    console.log(userId, typeof (userId), checkSchedule);
 
     try {
-        session.startTransaction();
-
-        // make a new mock for existing (myself) user
-        // todo : i have added unique compound index so no duplicates allowed
-        const myBooking = new mockModel({
-            mockType,
-            schedule: new Date(checkSchedule),
-            user: userId,
-        });
         try {
-            await myBooking.save({ session });
-        }
-        catch (error) {
-            if (error.code == 11000) {
-                await session.abortTransaction();
-                session.endSession();
+            let ifUserBookingExist = await mockModel.findOne({
+                user: userId,
+                mockType,
+                schedule: checkSchedule
+            });
+
+            console.log("userController -> checking :: ", ifUserBookingExist);
+            if (ifUserBookingExist) {
                 return res.send({
                     message: "You cannot book two entries for the same time",
                     code: 1,
                 });
             }
-            return res.send({
-                message: "Something went wrong",
-                code: 4
-            })
         }
-
-
-        // 2: Lock conflicting booking atomically (with session)
-        // $ne is not equal to
-        // locking the slot so no one can grab
-        const isBookingAvailable = await mockModel.findOneAndUpdate(
-            {
-                mockType,
-                schedule: new Date(checkSchedule),
-                user: { $ne: userId },
-                tempLock: false,
-            },
-            // templock:true, makes it unavailable now
-            { $set: { tempLock: true } },
-            { new: true, session }
-            // By default, findOneAndUpdate returns the document before the update.
-            // new: true tells Mongoose to return the document after the update.
-            // session : tells Mongoose to run this query as part of the MongoDB transaction session you
-        );
-
-        if (isBookingAvailable) {
-
-            //  get other user info
-            const otherUserID = isBookingAvailable.user.valueOf();
-            const otherUserTicketID = isBookingAvailable._id.valueOf();
-
-            const bookingId = myBooking._id.valueOf();
-
-            // Update both users with booking info (with session)
-            // so we can display in the user profile
-            const roomID = generateRandomString();
-
-            await userModel.findOneAndUpdate(
-                { _id: userId },
-                {
-                    $push: {
-                        bookings: {
-                            myUserId: userId,
-                            otherUserId: otherUserID,
-                            bookingTime: checkSchedule,
-                            mockType,
-                            myTicketId: bookingId,
-                            otherUserTicketID,
-                            roomID,
-                        },
-                    },
-                },
-                { session }
-            );
-
-            await userModel.findOneAndUpdate(
-                { _id: otherUserID },
-                {
-                    $push: {
-                        bookings: {
-                            myUserId: otherUserID,
-                            otherUserId: userId,
-                            bookingTime: checkSchedule,
-                            mockType,
-                            myTicketId: otherUserTicketID,
-                            otherUserTicketID: bookingId,
-                            roomID,
-                        },
-                    },
-                },
-                { session }
-            );
-
-            await session.commitTransaction();
-            session.endSession();
-
+        catch (error) {
+            console.log("userController -> error :: ", error);
             return res.send({
-                message: "Your booking is confirmed, please check your profile",
-                code: 2,
+                message: "You cannot book two entries for the same time",
+                code: 19,
             });
-        } else {
-
-            await myBooking.updateOne({ $set: { tempLock: false } }, { session });
-            await session.commitTransaction();
-            session.endSession();
-
+        }
+        try{
+            await publishBookingRequestToRabbitMQServer(userId, mockType, timeSlot);
+            console.log("ho gya");
             return res.send({
-                message: "No one to schedule, we are adding you for booking",
-                code: 3,
+                message: "Your booking request is queued. You will be notified once confirmed.",
+                code: 0
             });
+        }
+        catch(error){
+            console.log("userController second error :: " , error);
         }
     }
     catch (error) {
-        await session.abortTransaction();
-        session.endSession();
-        console.error("Error in handling availability:", error);
-        return res.status(500).send("Server error");
+        console.error("Error publishing booking request:", error);
+        return res.status(500).send("Failed to queue booking request");
+    }
+}
+
+async function getNotifications(req, res) {
+    try {
+        const { userName } = req.user;  // coming from cookie auth middleware
+        console.log("getting ut notifications", userName);
+
+        if (!userName) {
+            return res.status(400).json({ message: "User not authenticated" });
+        }
+
+        const user = await userModel.findOne({ userName })
+            .populate("notification")
+            .exec();
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        return res.json({ notifications: user.notification });
+
+    } catch (err) {
+        console.error("Error fetching notifications:", err);
+        return res.status(500).json({ message: "Server error" });
     }
 }
 
@@ -242,4 +171,5 @@ module.exports = {
     handleAvailability,
     handleUpdateUserInfo,
     handleCancelBooking,
+    getNotifications
 };

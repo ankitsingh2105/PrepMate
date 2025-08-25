@@ -5,12 +5,13 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
 require('dotenv').config({ quiet: true });
+const startWorker = require("./consumers/bookingWorker");
 
 // Routes
 const loginRouter = require("./Router/login");
 const signupRouter = require("./Router/signup");
 const userRouter = require("./Router/userRoutes");
-const connect = require("./connect");
+const connect = require("./config/mongodbAtlas");
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -19,6 +20,7 @@ const io = new Server(server, {
       "http://localhost:5173",
       "https://prep-mate-one.vercel.app",
       "https://prepmatee.vercel.app",
+      "http://192.168.0.100:5173"
     ],
     credentials: true
   },
@@ -31,6 +33,7 @@ app.use(cors({
     "http://localhost:5173",
     "https://prep-mate-one.vercel.app",
     "https://prepmatee.vercel.app",
+    "http://192.168.0.100:5173"
   ],
   credentials: true
 }));
@@ -86,7 +89,7 @@ interviewNamespace.on("connection", (socket) => {
 
     // Notify others
     const otherUsers = Array.from(roomSet).filter(id => id !== socket.id);
-    console.log("otherUser :: " , otherUsers);
+    console.log("otherUser :: ", otherUsers);
     if (otherUsers.length > 0) {
       interviewNamespace.to(otherUsers[0]).emit("user:joined", { email, socketID: socket.id, name });
     }
@@ -125,7 +128,7 @@ interviewNamespace.on("connection", (socket) => {
 // ---------------- CODE EDIT NAMESPACE ----------------
 codeEditNamespace.on("connection", (socket) => {
   socket.on("joinRoom", (room) => {
-    console.log("user joinedn the coding space :: ", room , " :: " , socket.id)
+    console.log("user joinedn the coding space :: ", room, " :: ", socket.id)
     socket.join(room);
     socket.to(room).emit("newUserJoin", { newUserId: socket.id });
   });
@@ -163,5 +166,8 @@ notificationNamespace.on("connection", (socket) => {
 // ---------------- START SERVER ---------------
 const PORT = process.env.PORT;
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  startWorker()
+    .then(() => console.log("Booking worker started"))
+    .catch(err => console.error("Worker failed to start:", err));
+  console.log(`Server running on port ${PORT}`);
 }); 
