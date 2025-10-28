@@ -10,6 +10,4 @@ async function connectToRabbitMQServer(uri) {
         throw err; 
     }
 }
-
-
 module.exports = connectToRabbitMQServer

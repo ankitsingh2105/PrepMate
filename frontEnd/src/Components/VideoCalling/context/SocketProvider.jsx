@@ -19,13 +19,15 @@ export default function SocketProvider(props) {
     console.log(backEndLink);
     const socket = useMemo(() => io(`${backEndLink}/interview`, {
         withCredentials: true,
-        transports: ["websocket", "polling"]
+        transports: ["websocket", "polling"],
+        autoConnect: false,
     }), []);
-
-
+    
+    
     const socketForCode = useMemo(() => io(`${backEndLink}/code-edit`, {
         withCredentials: true,
-        transports: ["websocket", "polling"]
+        transports: ["websocket", "polling"],
+        autoConnect: false,
     }), []);
 
     return (

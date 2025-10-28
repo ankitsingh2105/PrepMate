@@ -64,7 +64,7 @@ async function handleAvailability(req, res) {
 
 async function getNotifications(req, res) {
     try {
-        const { userName } = req.user;  // coming from cookie auth middleware
+        const { userName } = req.user; 
         console.log("getting ut notifications", userName);
 
         if (!userName) {

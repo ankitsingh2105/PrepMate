@@ -70,7 +70,7 @@ export default function Navbar() {
           </div>
 
           {/* Right Side */}
-          <div className="hidden sm:flex sm:items-center">
+          <div className="flex sm:items-center">
             {!loading && userDetails?.name ? (
               <div className="flex items-center space-x-4 relative">
                 {/* Notification Bell */}
@@ -123,7 +123,7 @@ export default function Navbar() {
                 )}
 
                 {/* Welcome Text */}
-                <span className="hidden md:inline-block text-sm font-medium text-gray-700">
+                <span className="inline-block text-sm font-medium text-gray-700">
                   Welcome,{" "}
                   <span className="font-semibold text-purple-600">
                     {userDetails.name.split(" ")[0]}
@@ -133,7 +133,7 @@ export default function Navbar() {
                 {/* Logout Button */}
                 <button
                   onClick={handleLogout}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
                 >
                   Sign out
                 </button>

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const mockModel = require("../Model/mockModel");
+const notificationModel = require("../Model/notificationModel");
 
 async function cleanUp() {
     try {
@@ -8,6 +9,7 @@ async function cleanUp() {
 
         console.log("⚠️ Deleting all mockModel documents...");
         const result = await mockModel.deleteMany({});
+        await notificationModel.deleteMany({});
         console.log(`✅ Deleted ${result.deletedCount} documents from mockModel`);
     } 
     catch (err) {

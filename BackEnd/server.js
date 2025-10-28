@@ -29,7 +29,7 @@ const io = new Server(server, {
 
 // Middlewares
 app.use(cors({
-  origin: [
+  origin: [ 
     "http://localhost:5173",
     "https://prep-mate-one.vercel.app",
     "https://prepmatee.vercel.app",
@@ -60,7 +60,7 @@ const socketToUser = new Map();
 
 // ---------------- INTERVIEW NAMESPACE ----------------
 interviewNamespace.on("connection", (socket) => {
-  console.log(`🔌 Socket ${socket.id} connected`);
+  console.log(`Socket ${socket.id} connected`);
 
   socket.on("room:join", ({ email, room, name }) => {
     console.log(email, room, name);
@@ -96,7 +96,7 @@ interviewNamespace.on("connection", (socket) => {
 
     socket.emit("room:joined", { room, users: Array.from(roomSet) });
   });
-
+s
   socket.on("user:call", ({ to, offer }) => {
     interviewNamespace.to(to).emit("incoming:call", { from: socket.id, offer });
   });
@@ -121,7 +121,7 @@ interviewNamespace.on("connection", (socket) => {
       socketToRoom.delete(socket.id);
       socketToUser.delete(socket.id);
     }
-    console.log(`🔌 Socket ${socket.id} disconnected`);
+    console.log(`Socket ${socket.id} disconnected`);
   });
 });
 
