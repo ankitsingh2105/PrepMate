@@ -11,7 +11,7 @@ const mockSchema = new mongoose.Schema({
     },
     tempLock: {
         type: Boolean,
-        default: true,
+        default: false,
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,

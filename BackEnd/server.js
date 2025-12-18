@@ -5,8 +5,8 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { Server } = require("socket.io");
 require('dotenv').config({ quiet: true });
-const startWorker = require("./consumers/bookingWorker");
-
+const bookingConsumer = require("./MessagingQueues/consumers/bookingConsumer")
+const exchange = require("./MessagingQueues/exchanges/exchange")
 // Routes
 const loginRouter = require("./Router/login");
 const signupRouter = require("./Router/signup");
@@ -26,7 +26,7 @@ const io = new Server(server, {
   },
   transports: ["websocket", "polling"]
 });
-
+ 
 // Middlewares
 app.use(cors({
   origin: [
@@ -163,11 +163,10 @@ notificationNamespace.on("connection", (socket) => {
   });
 });
 
+(async function(){
+  await exchange();
+  await bookingConsumer();
+})();
 // ---------------- START SERVER ---------------
 const PORT = process.env.PORT;
-server.listen(PORT, () => {
-  startWorker()
-    .then(() => console.log("Booking worker started"))
-    .catch(err => console.error("Worker failed to start:", err));
-  console.log(`Server running on port ${PORT}`);
-}); 
+server.listen(PORT); 

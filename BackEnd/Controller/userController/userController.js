@@ -2,7 +2,7 @@ const userModel = require("../../Model/userModel");
 const mockModel = require("../../Model/mockModel");
 const mongoose = require("mongoose");
 require("../../Model/notificationModel");
-const publishBookingRequestToRabbitMQServer = require("../../producers/bookingPublisher")
+const publishBookingRequestToRabbitMQServer = require("../../MessagingQueues/publisher/producer")
 
 async function handleUserInfo(req, response) {
     const { userName } = req.user;
@@ -19,48 +19,36 @@ async function handleUserInfo(req, response) {
 async function handleAvailability(req, res) {
     const { timeSlot, mockType, userId } = req.body;
     const checkSchedule = new Date(timeSlot.date + " " + timeSlot.time);
-    console.log(userId, typeof (userId), checkSchedule);
 
     try {
-        try {
-            let ifUserBookingExist = await mockModel.findOne({
-                user: userId,
-                mockType,
-                schedule: checkSchedule
-            });
+        // Step 1: Check duplicate booking
+        const existing = await mockModel.findOne({
+            user: userId,
+            mockType,
+            schedule: checkSchedule
+        });
 
-            console.log("userController -> checking :: ", ifUserBookingExist);
-            if (ifUserBookingExist) {
-                return res.send({
-                    message: "You cannot book two entries for the same time",
-                    code: 1,
-                });
-            }
-        }
-        catch (error) {
-            console.log("userController -> error :: ", error);
+        if (existing) {
             return res.send({
                 message: "You cannot book two entries for the same time",
-                code: 19,
+                code: 1
             });
-        }
-        try{
-            await publishBookingRequestToRabbitMQServer(userId, mockType, timeSlot);
-            console.log("ho gya");
-            return res.send({
-                message: "Your booking request is queued. You will be notified once confirmed.",
-                code: 0
-            });
-        }
-        catch(error){
-            console.log("userController second error :: " , error);
-        }
-    }
-    catch (error) {
-        console.error("Error publishing booking request:", error);
+        } 
+
+        // Step 2: Push booking request to queue
+        await publishBookingRequestToRabbitMQServer(userId, mockType, timeSlot);
+
+        return res.send({
+            message: "Your booking request is queued. You will be notified once confirmed.",
+            code: 0
+        });
+
+    } catch (err) {
+        console.error("Error handling availability:", err);
         return res.status(500).send("Failed to queue booking request");
     }
 }
+
 
 async function getNotifications(req, res) {
     try {
