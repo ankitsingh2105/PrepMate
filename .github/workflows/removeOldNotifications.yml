@@ -1,27 +1,27 @@
-name: Clean Old Mocks
+name: Delete old notifications
 
-on:
+on: 
   schedule:
     - cron: "30 18 * * *"
   workflow_dispatch:
-
+    
 jobs:
   cleanup:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
-        with:
+        with: 
           node-version: 18
 
-      - name: Install mongoose
-        run: npm install mongoose
+      - name : Install mongoose
+        uses : npm install mongoose
 
-      - name: Run cleanup script
-        env:
-          MONGO_URI: ${{ secrets.MONGO_URI }}
-        run: node BackEnd/utils/cleanOldMocks.js
+      - name : Run cleanup script
+        env: 
+          MONGO_URI: ${{secrets.MONGO_URI}}
+        run: node BackEnd/utils/cleanOldNotifications.js
