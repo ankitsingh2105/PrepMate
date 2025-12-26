@@ -18,8 +18,9 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install mongoose
-        run: npm install mongoose
+      - name: Install dependencies
+        run: |
+          npm install mongoose
 
       - name: Run cleanup script
         env:
