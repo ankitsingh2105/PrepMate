@@ -8,7 +8,7 @@ const notoficationModel = require("../../Model/notificationModel");
 async function bookingConsumer() {
     console.log("Starting Booking Worker...");
     const connection = await connectToRabbitMQServer(process.env.RABBITMQ_URI);
-    await connectToMongoDB(process.env.MONGODB_ATLAS_URI);
+    await connectToMongoDB(process.env.MONGO_URI);
 
     const channel = await connection.createChannel();
     // Must match the queue bound to the `slotBooking` exchange in `MessagingQueues/exchanges/exchange.js`
@@ -67,9 +67,9 @@ async function bookingConsumer() {
                     mockType,
                     schedule: checkSchedule,
                     user: { $ne: userId },
-                    tempLock: false,
+                    isAvailable: false,
                 },
-                { $set: { tempLock: true } },
+                { $set: { isAvailable: true } },
                 { new: true, session }
             );
 
@@ -87,7 +87,7 @@ async function bookingConsumer() {
                         schedule: checkSchedule,
                         user: userId,
                     },
-                    { $set: { tempLock: true } },
+                    { $set: { isAvailable: true } },
                     { new: true, session }
                 );
 
@@ -150,8 +150,8 @@ async function bookingConsumer() {
 
             }
             else {
-                console.log("No one available to pair. Releasing tempLock for user:", userId);
-                await myBooking.updateOne({ $set: { tempLock: false } }, { session });
+                console.log("No one available to pair. Releasing isAvailable for user:", userId);
+                await myBooking.updateOne({ $set: { isAvailable: false } }, { session });
             }
 
             // Step 4: Commit transaction

@@ -9,7 +9,7 @@ const mockSchema = new mongoose.Schema({
         type: Date,
         required : true,
     },
-    tempLock: {
+    isAvailable: {
         type: Boolean,
         default: false,
     },

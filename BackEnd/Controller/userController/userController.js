@@ -133,7 +133,7 @@ async function handleCancelBooking(req, res) {
         // Remove mock booking from otherUser side
         await mockModel.findOneAndUpdate({ _id: otherUserTicketID },
             {
-                $set: { tempLock: false },
+                $set: { isAvailable: false },
             },
             { session });
 

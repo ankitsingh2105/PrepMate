@@ -41,7 +41,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Connect DB
-connect(process.env.MONGODB_ATLAS_URI);
+connect(process.env.MONGO_URI);
 
 // Routes
 app.get("/", (req, res) => res.send("API is working"));
